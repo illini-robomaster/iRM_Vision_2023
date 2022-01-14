@@ -127,8 +127,9 @@ class Yolo:
             hier_thresh: confidence threshold for unet
             nms: overlap threshold for nms
         '''
-        self.net = load_net(cfg_path, weight_path)
-        self.meta = load_meta(meta_path)
+        print(type(cfg_path), type(weight_path))
+        self.net = load_net(cfg_path.encode(), weight_path.encode(), 0)
+        self.meta = load_meta(meta_path.encode())
         self.thresh = thresh
         self.hier_thresh = hier_thresh
         self.nms = nms

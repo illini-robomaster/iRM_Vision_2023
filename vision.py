@@ -1,26 +1,43 @@
-import os
+import os, time
 import cv2
 from Aiming.Aim import Aim
 from Camera.camera import Camera
 from Communication.communicator import Communicator
 from Detection.darknet import Yolo
-from variables import META_PATH, MODEL_CFG_PATH, WEIGHT_PATH
-
+from variables import *
 
 if __name__ == "__main__":
-    camera = Camera()
+    cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+
     model = Yolo(MODEL_CFG_PATH, WEIGHT_PATH, META_PATH)
     aimer = Aim()
     communicator = Communicator()
+    if cap.isOpened():
+        while True:
+            start = time.time()
+            ret, frame = cap.read()
+            if do_display:
+                cv2.imshow('CSI Camera',frame)
+                # This also acts as
+                keyCode = cv2.waitKey(30) & 0xff
+                # Stop the program on the ESC key
+                if keyCode == 27:
+                   break
 
-    while True:
-        frame = camera.get_frame()
-        #!TODO: make this more elegant
-        cv2.imwrite("tmp.jpg", frame)
-        pred = model.detect("tmp.jpg")
-        os.remove("tmp.jpg")
-        # or should we use pid?
-        yaw, pitch = aimer.get_rotation(pred)
-        communicator.move(yaw, pitch)
+            #!TODO: make this more elegant
+            start_write = time.time()
+            cv2.imwrite(TMP_IMG, frame)
+            write_overhead = time.time()-start_write
+
+            pred = model.detect(TMP_IMG.encode())
+            print('----------------\n',pred)
+            elapsed = time.time()-start
+            print('fps:',1./elapsed, ', write_overhead:', write_overhead/elapsed)
+
+            # TODO: or should we use pid?
+            #yaw, pitch = aimer.get_rotation(pred)
+            #communicator.move(yaw, pitch)
+    else:
+        print('Failed to open camera!')
 
 
