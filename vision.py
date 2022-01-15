@@ -24,15 +24,10 @@ if __name__ == "__main__":
                 if keyCode == 27:
                    break
 
-            #!TODO: make this more elegant
-            start_write = time.time()
-            cv2.imwrite(TMP_IMG, frame)
-            write_overhead = time.time()-start_write
-
-            pred = model.detect(TMP_IMG.encode())
+            pred = model.detect(frame)
             print('----------------\n',pred)
             elapsed = time.time()-start
-            print('fps:',1./elapsed, ', write_overhead:', write_overhead/elapsed)
+            print('fps:',1./elapsed)
 
             # TODO: or should we use pid?
             #yaw, pitch = aimer.get_rotation(pred)

@@ -1,9 +1,12 @@
 from ctypes import *
+import numpy as np
 import random
 
 from variables import DARKNET_LIB_PATH
 
+# Note: darknet is patched per issue https://github.com/pjreddie/darknet/issues/289
 #============= copied from pjreddie's darknet repo
+
 def sample(probs):
     s = sum(probs)
     probs = [a/s for a in probs]
@@ -18,6 +21,7 @@ def c_array(ctype, values):
     arr = (ctype*len(values))()
     arr[:] = values
     return arr
+
 
 class BOX(Structure):
     _fields_ = [("x", c_float),
@@ -112,6 +116,17 @@ rgbgr_image.argtypes = [IMAGE]
 predict_image = lib.network_predict_image
 predict_image.argtypes = [c_void_p, IMAGE]
 predict_image.restype = POINTER(c_float)
+
+ndarray_image = lib.ndarray_to_image
+ndarray_image.argtypes = [POINTER(c_ubyte), POINTER(c_long), POINTER(c_long)]
+ndarray_image.restype = IMAGE
+
+def nparray_to_image(img):
+    data = img.ctypes.data_as(POINTER(c_ubyte))
+    image = ndarray_image(data, img.ctypes.shape, img.ctypes.strides)
+
+    return image
+
 #============= copied from pjreddie's darknet repo
 
 class Yolo:
@@ -142,7 +157,8 @@ class Yolo:
         Return:
             An array of tuple (class name, prob, (x, y, w, h))
         '''
-        im = load_image(image, 0, 0)
+        #im = load_image(image, 0, 0)
+        im = nparray_to_image(image)
         num = c_int(0)
         pnum = pointer(num)
         predict_image(self.net, im)
