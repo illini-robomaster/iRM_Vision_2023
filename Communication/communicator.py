@@ -2,9 +2,10 @@ import time
 import serial
 import crc8
 import crc16
+from variables import SERIAL_PORT
 
 serial_port = serial.Serial(
-    port="/dev/ttyTHS1",
+    port=SERIAL_PORT,
     baudrate=115200,
     bytesize=serial.EIGHTBITS,
     parity=serial.PARITY_NONE,
@@ -14,19 +15,22 @@ serial_port = serial.Serial(
 time.sleep(1)
 
 def create_packet(cmd_id, data, seq):
+    '''
+    Args:
+        cmd_id: bytes, ID for command to send, see "variables" for different cmd
+        data: bytes, data to send
+        seq: int, n-th packet to send
+    Return:
+        Bytes of encoded package with format:
+            SOF(1 byte) data_len(2 bytes) seq (1 bytes) crc8 (1 bytes) data (x bytes) crc16 (2 bytes)
+    '''
     # header
     SOF = b'\xa5'
-    #data_len = b'\xff\xff'
     data_len = len(data).to_bytes(2,'big')
-    #seq = b'\x00'
     seq = seq.to_bytes(1,'big')
-    hash = crc8.crc8()
+    hash = crc8.crc8() #crc8
     hash.update(SOF+data_len+seq)
     crc_header = hash.digest()
-
-    #command
-    #cmd_id = b'\xde\xad'
-    #data = 0xffff*b'\xAA'
 
     #tail
     crc_data = crc16.crc16xmodem(data).to_bytes(2,'big')
@@ -47,6 +51,8 @@ if __name__ =='__main__':
             if serial_port.inWaiting() > 0:
                 data = serial_port.read()
                 print(data)
+    except:
+        print("Falied to write")
 
 
 class Communicator:
