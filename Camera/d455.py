@@ -1,11 +1,6 @@
 import numpy as np
 import pyrealsense2 as rs
-
-def deg_to_rad(deg):
-    return deg * ((2 * np.pi) / 360)
-
-def rad_to_deg(rad):
-    return rad * (360. / (2 * np.pi))
+import Utils
 
 # TODO: make an abstract camera base class
 class D455_camera(object):

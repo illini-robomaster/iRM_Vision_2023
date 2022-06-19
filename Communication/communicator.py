@@ -4,6 +4,7 @@ import crc8
 import crc16
 from config import SERIAL_PORT
 
+# TODO: handle non-sudo case
 serial_port = serial.Serial(
     port=SERIAL_PORT,
     baudrate=115200,
