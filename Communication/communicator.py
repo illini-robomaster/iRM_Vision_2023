@@ -2,7 +2,7 @@ import time
 import serial
 import crc8
 import crc16
-from variables import SERIAL_PORT
+from config import SERIAL_PORT
 
 serial_port = serial.Serial(
     port=SERIAL_PORT,

@@ -2,7 +2,7 @@ from ctypes import *
 import numpy as np
 import random
 
-from variables import DARKNET_LIB_PATH
+from config import DARKNET_LIB_PATH
 
 # Note: darknet is patched per issue https://github.com/pjreddie/darknet/issues/289
 #============= copied from pjreddie's darknet repo
