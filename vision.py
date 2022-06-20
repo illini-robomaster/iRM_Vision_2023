@@ -30,9 +30,10 @@ if __name__ == "__main__":
         if cv2.waitKey(1) & 0xFF == ord('q'):
             exit(0)
         
-        yaw_diff, pitch_diff = aimer.process_one(pred, enemy_team, depth)
+        ret = aimer.process_one(pred, enemy_team, depth)
 
-        if pred:
+        if ret:
+            yaw_diff, pitch_diff = ret
             packet = create_packet(config.MOVE_YOKE, pkt_seq, yaw_diff, pitch_diff)
         else:
             packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
