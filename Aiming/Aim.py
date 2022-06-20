@@ -1,5 +1,6 @@
 import numpy as np
 import config
+import Utils
 
 class Aim:
     def __init__(self):
@@ -7,7 +8,7 @@ class Aim:
 
     def process_one(self, pred_list, enemy_team, depth_map):
         assert enemy_team in ['blue', 'red']
-        closet_pred = self.get_closet_pred(pred_list, enemy_team)
+        closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, depth_map)
         if closet_pred is None:
             return None
         name, confidence, bbox = closet_pred
@@ -15,16 +16,8 @@ class Aim:
 
         # Get yaw/pitch differences in radians
         yaw_diff, pitch_diff = self.get_rotation_angle(center_x, center_y)
-        upper_left_x = int(center_x - width / 2)
-        upper_left_y = int(center_y - height / 2)
-        lower_right_x = int(center_x + width / 2)
-        lower_right_y = int(center_y + height / 2)
 
-        # Get distance to target
-        depth_region = depth_map[upper_left_y:lower_right_y,upper_left_x:lower_right_x]
-        estimated_depth = np.mean(depth_region[depth_region > 0])
-
-        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(yaw_diff, pitch_diff, estimated_depth)
+        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(yaw_diff, pitch_diff, closet_dist)
 
         return (calibrated_yaw_diff, calibrated_pitch_diff)
     
@@ -40,27 +33,31 @@ class Aim:
         Returns:
             (float, float): calibrated yaw_diff, pitch_diff in radians
         """
-        # TODO: compute a range table
-        return (yaw_diff, pitch_diff)
+        if distance >= 2**16:
+            # In this case, distance is a rough estimation from bbox size
+            # TODO: make a table?
+            return (yaw_diff, pitch_diff)
+        else:
+            # In this case, distance comes from D455 stereo estimation
+            # TODO: compute a range table
+            return (yaw_diff, pitch_diff)
     
-    def get_closet_pred(self, pred_list, enemy_team):
+    def get_closet_pred(self, pred_list, enemy_team, depth_map):
         closet_pred = None
-        closet_l2_dist = None
+        closet_dist = None # Cloest to camera in z-axis
         obj_of_interest = [f"armor_{enemy_team}"]
         for name, conf, bbox in pred_list:
             # name from C++ string is in bytes; decoding is needed
             if name.decode('utf-8') not in obj_of_interest: continue
-            center_x, center_y, _, _ = bbox
-            # TODO: use depth distance instead of L2 dist for watcher for easy targets?
-            cur_l2_dist = np.square(config.IMG_CENTER_X // 2 - center_x) + np.square(config.IMG_CENTER_Y // 2 - center_y)
+            cur_dist = Utils.estimate_target_depth(bbox, depth_map)
             if closet_pred is None:
                 closet_pred = (name, conf, bbox)
-                closet_l2_dist = cur_l2_dist
+                closet_dist = cur_dist
             else:
-                if cur_l2_dist < closet_l2_dist:
+                if cur_dist < closet_dist:
                     closet_pred = (name, conf, bbox)
-                    closet_l2_dist = cur_l2_dist
-        return closet_pred
+                    closet_dist = cur_dist
+        return closet_pred, cur_dist
 
     def get_rotation_angle(bbox_center_x, bbox_center_y):
         yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.RGBD_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
