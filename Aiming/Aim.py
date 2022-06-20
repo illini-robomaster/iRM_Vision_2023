@@ -19,7 +19,12 @@ class Aim:
 
         calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(yaw_diff, pitch_diff, closet_dist)
 
-        return (calibrated_yaw_diff, calibrated_pitch_diff)
+        return {
+            'yaw_diff': calibrated_yaw_diff,
+            'pitch_diff': calibrated_pitch_diff,
+            'center_x': center_x,
+            'center_y': center_y,
+        }
     
     def posterior_calibration(self, yaw_diff, pitch_diff, distance):
         """Given a set of naively estimated parameters, return calibrated parameters
@@ -35,7 +40,6 @@ class Aim:
         """
         if distance >= 2**16:
             # In this case, distance is a rough estimation from bbox size
-            # TODO: make a table?
             return (yaw_diff, pitch_diff)
         else:
             # In this case, distance comes from D455 stereo estimation
@@ -59,6 +63,7 @@ class Aim:
                     closet_dist = cur_dist
         return closet_pred, cur_dist
 
+    @staticmethod
     def get_rotation_angle(bbox_center_x, bbox_center_y):
         yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.RGBD_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
         pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * (config.RGBD_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
