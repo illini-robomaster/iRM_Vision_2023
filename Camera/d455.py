@@ -6,8 +6,8 @@ import Utils
 class D455_camera(object):
     # Camera parameters from intelrealsense.com/depth-camera/d-455/
     # TODO: for better accuracy, use individual calibrated intrinsics
-    YAW_FOV_HALF = deg_to_rad(87) / 2
-    PITCH_FOV_HALF = deg_to_rad(58) / 2
+    YAW_FOV_HALF = Utils.deg_to_rad(87) / 2
+    PITCH_FOV_HALF = Utils.deg_to_rad(58) / 2
 
     def __init__(self, width, height):
         self.width = width
