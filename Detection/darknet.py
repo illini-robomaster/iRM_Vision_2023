@@ -161,7 +161,6 @@ class Yolo:
         '''
         Args:
             image: path to image to predict
-            !TODO: rewrite this to reading an array
         Return:
             An array of tuple (class name, prob, (x, y, w, h))
         '''

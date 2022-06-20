@@ -6,14 +6,17 @@ from config import SERIAL_PORT
 
 import config
 
-# TODO: handle non-sudo case
-serial_port = serial.Serial(
-    port=SERIAL_PORT,
-    baudrate=115200,
-    bytesize=serial.EIGHTBITS,
-    parity=serial.PARITY_NONE,
-    stopbits=serial.STOPBITS_ONE,
-)
+try:
+    serial_port = serial.Serial(
+        port=SERIAL_PORT,
+        baudrate=115200,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+    )
+except serial.serialutil.SerialException:
+    serial_port = None
+
 # Wait a second to let the port initialize
 time.sleep(1)
 
@@ -59,6 +62,7 @@ def create_packet_w_crc(cmd_id, data, seq):
 
 # Testing code
 if __name__ =='__main__':
+    assert serial_port is not None, "No serial device found; check root priviledge and USB devices"
     try:
         cmd_id = b'\xde\xad'
         data = 0xffff*b'\xAA'

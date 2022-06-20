@@ -4,7 +4,6 @@ from Aiming.Aim import Aim
 from Communication.communicator import serial_port, create_packet
 from Detection.darknet import Yolo
 import config
-import numpy as np
 
 if __name__ == "__main__":
     model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
@@ -38,6 +37,9 @@ if __name__ == "__main__":
         else:
             packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
 
-        communicator.write(packet)
+        if communicator is not None:
+            communicator.write(packet)
+        else:
+            print("PACKET CREATED BUT SERIAL DEVICE IS NOT AVAILABLE!!!")
 
         pkt_seq += 1
