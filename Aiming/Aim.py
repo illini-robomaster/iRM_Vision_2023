@@ -61,7 +61,7 @@ class Aim:
                 if cur_dist < closet_dist:
                     closet_pred = (name, conf, bbox)
                     closet_dist = cur_dist
-        return closet_pred, cur_dist
+        return closet_pred, closet_dist
 
     @staticmethod
     def get_rotation_angle(bbox_center_x, bbox_center_y):
