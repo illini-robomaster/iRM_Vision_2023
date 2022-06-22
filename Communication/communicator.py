@@ -2,20 +2,27 @@ import time
 import serial
 import crc8
 import crc16
-from config import SERIAL_PORT
 
 import config
 
-try:
-    serial_port = serial.Serial(
-        port=SERIAL_PORT,
-        baudrate=115200,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-    )
-except serial.serialutil.SerialException:
-    serial_port = None
+# USB is for TTL-only device
+USB_PREFIX = "/dev/ttyUSB"
+# ACM is for st-link/TTL device
+ACM_PREFIX = "/dev/ttyACM"
+
+for prefix in [USB_PREFIX, ACM_PREFIX]:
+    for i in range(5):
+        try:
+            serial_port = serial.Serial(
+                port=prefix + str(i),
+                baudrate=115200,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+            )
+            break # if succeed, break
+        except serial.serialutil.SerialException:
+            serial_port = None
 
 # Wait a second to let the port initialize
 time.sleep(1)

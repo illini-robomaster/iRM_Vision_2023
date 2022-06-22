@@ -5,8 +5,6 @@ WEIGHT_PATH = r'/home/illinirm/darknet/dji_roco_preprocessed/yolov3-tiny-custom_
 META_PATH = r'/home/illinirm/darknet/dji_roco_preprocessed/roco.data'
 
 # communication utils
-SERIAL_PORT = "/dev/ttyACM0"
-
 SEARCH_TARGET = b'ST'
 MOVE_YOKE = b'MY'
 PACK_END = b'ED'
