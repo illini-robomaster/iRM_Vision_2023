@@ -3,6 +3,25 @@ import cv2
 import os
 import time
 
+def auto_align_brightness(img, target_v=50):
+    # Only decrease!
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    
+    cur_v = np.mean(v)
+    v_diff = cur_v - target_v
+    
+    if v_diff > 0:
+        value = v_diff
+        # needs lower brightness
+        v[v < value] = 0
+        v[v >= value] -= value
+        final_hsv = cv2.merge((h, s, v))
+        img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
+        return img
+    else:
+        return img
+
 class cv_mix_dl_detector:
     def __init__(self, detect_color, model_path='fc.onnx'):
         self.armor_proposer = cv_armor_proposer(detect_color)
@@ -13,6 +32,7 @@ class cv_mix_dl_detector:
         return self(rgb_img)
     
     def __call__(self, rgb_img):
+        rgb_img = auto_align_brightness(rgb_img)
         # defaults to BGR format
         rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
         # propose potential armors
