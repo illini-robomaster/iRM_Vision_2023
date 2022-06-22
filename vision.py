@@ -8,6 +8,8 @@ import config
 
 DEFAULT_ENEMY_TEAM = 'red'
 
+DEBUG_DISPLAY = False
+
 class serial_circular_buffer:
     def __init__(self, buffer_size=10):
         self.buffer = []
@@ -65,9 +67,7 @@ if __name__ == "__main__":
         model.change_color(enemy_team)
 
         pred = model.detect(frame)
-        print('----------------\n',pred)
         elapsed = time.time()-start
-        print('fps:',1./elapsed)
         
         ret_dict = aimer.process_one(pred, enemy_team, depth)
 
@@ -83,9 +83,12 @@ if __name__ == "__main__":
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
         
-        cv2.imshow('pred', show_frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            exit(0)
+        if DEBUG_DISPLAY:
+            print('----------------\n',pred)
+            print('fps:',1./elapsed)
+            cv2.imshow('pred', show_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                exit(0)
 
         if communicator is not None:
             communicator.write(packet)
