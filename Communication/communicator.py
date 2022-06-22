@@ -10,8 +10,12 @@ USB_PREFIX = "/dev/ttyUSB"
 # ACM is for st-link/TTL device
 ACM_PREFIX = "/dev/ttyACM"
 
+success_flag = False
+
 for prefix in [USB_PREFIX, ACM_PREFIX]:
+    if success_flag: break
     for i in range(5):
+        if success_flag: break
         try:
             serial_port = serial.Serial(
                 port=prefix + str(i),
@@ -20,6 +24,7 @@ for prefix in [USB_PREFIX, ACM_PREFIX]:
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
             )
+            success_flag = True
             break # if succeed, break
         except serial.serialutil.SerialException:
             serial_port = None
