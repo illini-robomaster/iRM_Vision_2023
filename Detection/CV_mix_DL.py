@@ -153,7 +153,7 @@ class armor_class:
 
 class cv_armor_proposer:
     # Hyperparameters
-    MIN_LIGHTNESS = 200 # default 160
+    MIN_LIGHTNESS = 160
 
     LIGHT_MIN_RATIO = 0.1
     LIGHT_MAX_RATIO = 0.55
@@ -332,15 +332,9 @@ class dl_digit_classifier:
             if softmax_probs[0, max_class] < self.CLASSIFIER_THRESHOLD or max_class_names == 'N':
                 continue
             
-            # TODO: these are for the 2022 NA final 3v3 only!
-            # Numbers during other competitions may differ.
-            if armor.armor_type == 'LARGE':
-                if max_class_names in ['1', 'B', 'G']:
-                    armor.confidence = softmax_probs[0, max_class]
-                    ret_list.append(armor)
-            else:
-                if max_class_names in ['O', '2', '3', '4', '5']:
-                    armor.confidence = softmax_probs[0, max_class]
-                    ret_list.append(armor)
+            # TODO: use digit predictions to improve accuracy?
+            # Right now using that logic causes a lot of false negatives...
+            armor.confidence = softmax_probs[0, max_class]
+            ret_list.append(armor)
 
         return ret_list
