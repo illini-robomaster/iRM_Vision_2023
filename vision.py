@@ -2,11 +2,15 @@ import time
 import cv2
 from Aiming.Aim import Aim
 from Communication.communicator import serial_port, create_packet
-from Detection.darknet import Yolo
+from Detection.YOLO import Yolo
+from Detection.CV_mix_DL import cv_mix_dl_detector
 import config
 
 if __name__ == "__main__":
-    model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
+    # FIXME: GET ENEMY TEAM FROM THE REFEREE SYS
+    enemy_team = 'blue'
+    model = cv_mix_dl_detector(enemy_team)
+    # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim()
     communicator = serial_port
     pkt_seq = 0
@@ -21,9 +25,6 @@ if __name__ == "__main__":
         print('----------------\n',pred)
         elapsed = time.time()-start
         print('fps:',1./elapsed)
-
-        # FIXME: GET ENEMY TEAM FROM THE REFEREE SYS
-        enemy_team = 'blue'
         
         ret_dict = aimer.process_one(pred, enemy_team, depth)
 
