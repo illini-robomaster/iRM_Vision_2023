@@ -6,6 +6,38 @@ from Communication.communicator import serial_port, create_packet
 from Detection.CV_mix_DL import cv_mix_dl_detector
 import config
 
+class serial_circular_buffer:
+    def __init__(self, buffer_size=10):
+        self.buffer = []
+        self.buffer_size = buffer_size
+        self.default_color = 'red'
+    
+    def receive(self, byte_array):
+        for c in byte_array:
+            if len(self.buffer) >= self.buffer_size:
+                self.buffer = self.buffer[1:] # pop first element
+            self.buffer.append(c)
+
+    def get_enemy_color(self):
+        # TODO: if a robot is revived, the serial port might get
+        # garbage value in between...
+        blue_cnt = 0
+        red_cnt = 0
+
+        for l in self.buffer:
+            if l == b'R': red_cnt += 1
+            if l == b'B': blue_cnt += 1
+        
+        if blue_cnt > red_cnt:
+            self.default_color = 'blue'
+            return 'blue'
+        
+        if red_cnt > blue_cnt:
+            self.default_color = 'red'
+            return 'red'
+        
+        return self.default_color
+
 if __name__ == "__main__":
     # FIXME: GET ENEMY TEAM FROM THE REFEREE SYS
     enemy_team = 'blue'
@@ -17,9 +49,20 @@ if __name__ == "__main__":
 
     rgbd_camera = config.RGBD_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
 
+    # color buffer which retrieves enemy color from STM32
+    my_color_buffer = serial_circular_buffer()
+
     while True:
         start = time.time()
         frame, depth = rgbd_camera.get_frame()
+
+        if (communicator.inWaiting() > 0):
+            # read the bytes and convert from binary array to ASCII
+            byte_array = communicator.read(communicator.inWaiting())
+            my_color_buffer.receive(byte_array)
+        
+        cur_color = my_color_buffer.get_enemy_color()
+        model.change_color(cur_color)
 
         pred = model.detect(frame)
         print('----------------\n',pred)
