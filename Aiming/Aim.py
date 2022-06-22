@@ -52,7 +52,11 @@ class Aim:
         obj_of_interest = [f"armor_{enemy_team}"]
         for name, conf, bbox in pred_list:
             # name from C++ string is in bytes; decoding is needed
-            if name.decode('utf-8') not in obj_of_interest: continue
+            if isinstance(name, bytes):
+                name_str = name.decode('utf-8')
+            else:
+                name_str = name
+            if name_str not in obj_of_interest: continue
             cur_dist = Utils.estimate_target_depth(bbox, depth_map)
             if closet_pred is None:
                 closet_pred = (name, conf, bbox)
