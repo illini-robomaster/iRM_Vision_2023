@@ -27,8 +27,8 @@ class serial_circular_buffer:
         red_cnt = 0
 
         for l in self.buffer:
-            if l == b'R': red_cnt += 1
-            if l == b'B': blue_cnt += 1
+            if l == ord('R'): red_cnt += 1
+            if l == ord('B'): blue_cnt += 1
         
         if blue_cnt > red_cnt:
             self.default_color = 'blue'
