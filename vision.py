@@ -6,11 +6,13 @@ from Communication.communicator import serial_port, create_packet
 from Detection.CV_mix_DL import cv_mix_dl_detector
 import config
 
+DEFAULT_ENEMY_TEAM = 'red'
+
 class serial_circular_buffer:
     def __init__(self, buffer_size=10):
         self.buffer = []
         self.buffer_size = buffer_size
-        self.default_color = 'red'
+        self.default_color = DEFAULT_ENEMY_TEAM
     
     def receive(self, byte_array):
         for c in byte_array:
@@ -39,9 +41,7 @@ class serial_circular_buffer:
         return self.default_color
 
 if __name__ == "__main__":
-    # FIXME: GET ENEMY TEAM FROM THE REFEREE SYS
-    enemy_team = 'blue'
-    model = cv_mix_dl_detector(enemy_team)
+    model = cv_mix_dl_detector(DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim()
     communicator = serial_port
@@ -61,8 +61,8 @@ if __name__ == "__main__":
             byte_array = communicator.read(communicator.inWaiting())
             my_color_buffer.receive(byte_array)
         
-        cur_color = my_color_buffer.get_enemy_color()
-        model.change_color(cur_color)
+        enemy_team = my_color_buffer.get_enemy_color()
+        model.change_color(enemy_team)
 
         pred = model.detect(frame)
         print('----------------\n',pred)
