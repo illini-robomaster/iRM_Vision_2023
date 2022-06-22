@@ -9,7 +9,7 @@ def auto_align_brightness(img, target_v=50):
     h, s, v = cv2.split(hsv)
     
     cur_v = np.mean(v)
-    v_diff = cur_v - target_v
+    v_diff = int(cur_v - target_v)
     
     if v_diff > 0:
         value = v_diff
