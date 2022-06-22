@@ -2,7 +2,7 @@ import time
 import cv2
 from Aiming.Aim import Aim
 from Communication.communicator import serial_port, create_packet
-from Detection.YOLO import Yolo
+# from Detection.YOLO import Yolo
 from Detection.CV_mix_DL import cv_mix_dl_detector
 import config
 
