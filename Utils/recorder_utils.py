@@ -4,7 +4,6 @@ import shutil
 import time
 import numpy as np
 import cv2
-import datetime
 
 
 class split_video_recorder:
@@ -20,12 +19,18 @@ class split_video_recorder:
         self.CFG = config
         self.TIME_PER_CLIP = TIME_PER_CLIP
         self.base_data_folder = self.CFG.LOGGING_FOLDER
-        # TODO(roger): datetime is inaccurate on Jetson without battery
-        cur_datetime = datetime.datetime.now()
+        # Determine folder
+        fn_list = [fn for fn in os.listdir(self.base_data_folder) if fn.isdigit()]
+        if fn_list:
+            max_idx = max([int(fn) for fn in fn_list])
+        else:
+            max_idx = 0
+        new_idx = max_idx + 1
         self.cur_data_folder = os.path.join(
             self.base_data_folder,
-            cur_datetime.strftime("%Y-%m-%d_%H-%M-%S"))
-        os.makedirs(self.cur_data_folder, exist_ok=True)
+            str(new_idx).zfill(8))
+        assert not os.path.exists(self.cur_data_folder)
+        os.makedirs(self.cur_data_folder)
         self.cur_video_writer = None
         self.cur_video_clip_idx = 0
 
