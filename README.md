@@ -17,7 +17,7 @@ I haven't try it yet. Shouldn't be a big issue though...
 - Detection/           --> Yolo code
 - Utils/               --> misc.
 - vision.py            --> vision driver
-- variables.py         --> global vars
+- config.py            --> global config (parameters and class instance)
 ```
 
 ## Dependencies:
