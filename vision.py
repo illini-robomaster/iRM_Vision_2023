@@ -8,7 +8,7 @@ import config
 
 DEFAULT_ENEMY_TEAM = 'red'
 
-DEBUG_DISPLAY = False
+DEBUG_DISPLAY = True
 
 class serial_circular_buffer:
     def __init__(self, buffer_size=10):
@@ -54,14 +54,18 @@ if __name__ == "__main__":
     # color buffer which retrieves enemy color from STM32
     my_color_buffer = serial_circular_buffer()
 
+    if communicator is None:
+        print("SERIAL DEVICE IS NOT AVAILABLE!!!")
+
     while True:
         start = time.time()
         frame, depth = rgbd_camera.get_frame()
 
-        if (communicator.inWaiting() > 0):
-            # read the bytes and convert from binary array to ASCII
-            byte_array = communicator.read(communicator.inWaiting())
-            my_color_buffer.receive(byte_array)
+        if communicator is not None:
+            if (communicator.inWaiting() > 0):
+                # read the bytes and convert from binary array to ASCII
+                byte_array = communicator.read(communicator.inWaiting())
+                my_color_buffer.receive(byte_array)
         
         enemy_team = my_color_buffer.get_enemy_color()
         model.change_color(enemy_team)
@@ -92,7 +96,5 @@ if __name__ == "__main__":
 
         if communicator is not None:
             communicator.write(packet)
-        else:
-            print("PACKET CREATED BUT SERIAL DEVICE IS NOT AVAILABLE!!!")
 
         pkt_seq += 1
