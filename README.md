@@ -1,11 +1,17 @@
 # iRM_Vision_2022
 repo for iRM vision.
 
-## build guide:
+## Data preparing
 
-!TODO
+We recorded some demo videos to demo auto-aiming capabilities of our robots,
+which is located under the folder `./large_data/`.
+However, due to the large sizes of the video, it's inappropriate to directly
+upload them to GitHub. Hence, to acquire theese sample videos, please download
+them at the [UofI box][https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e].
 
-I haven't try it yet. Shouldn't be a big issue though...
+## Dependencies
+
+Please follow instruction from the RMCV101 repo [here](https://github.com/illini-robomaster/RM_CV_101/blob/master/INSTALL.md).
 
 ## File Structure
 
