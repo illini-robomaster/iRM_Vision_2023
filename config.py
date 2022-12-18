@@ -9,12 +9,13 @@ SEARCH_TARGET = b'ST'
 MOVE_YOKE = b'MY'
 PACK_END = b'ED'
 
-from Camera.d455 import D455_camera
+# from Camera.d455 import D455_camera
+from Camera.read_from_file import fake_camera
 
-RGBD_CAMERA = D455_camera
+RGBD_CAMERA = fake_camera
 
 # Compute some constants and define camera to use
-IMG_HEIGHT=480
+IMG_HEIGHT=360
 IMG_WIDTH=640
 
 IMG_CENTER_X = IMG_WIDTH // 2
