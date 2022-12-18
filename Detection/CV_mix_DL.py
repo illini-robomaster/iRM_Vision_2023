@@ -20,6 +20,13 @@ def auto_align_brightness(img, target_v=50):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
     else:
+        # brighten
+        value = -v_diff
+        # needs lower brightness
+        v[v > (255 - value)] = 255
+        v[v <= (255 - value)] += value
+        final_hsv = cv2.merge((h, s, v))
+        img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
 class cv_mix_dl_detector:
