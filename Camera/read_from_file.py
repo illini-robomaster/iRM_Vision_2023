@@ -33,8 +33,8 @@ class fake_camera(object):
             self.alive = False
         
         if not self.alive:
-            raise
+            raise Exception("Video file exhausted")
         
         frame = cv2.resize(frame, (self.width, self.height))
 
-        return (frame, np.ones_like(frame))
+        return frame

@@ -11,7 +11,7 @@ class basic_tracker(object):
         self.last_pred = None
         self.last_last_pred = None
 
-    def register_one(self, pred_list, enemy_team, rgb_img, depth_map):
+    def register_one(self, pred_list, enemy_team, rgb_img):
         # TODO: add a tracking flag in pred_list to distinguish
         # tracked and detected objects
         my_pred_list = [i for i in pred_list if i[0] == f"armor_{enemy_team}"]

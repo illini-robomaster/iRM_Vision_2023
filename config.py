@@ -12,7 +12,7 @@ PACK_END = b'ED'
 # from Camera.d455 import D455_camera
 from Camera.read_from_file import fake_camera
 
-RGBD_CAMERA = fake_camera
+AUTOAIM_CAMERA = fake_camera
 
 # Compute some constants and define camera to use
 IMG_HEIGHT=360

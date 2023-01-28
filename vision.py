@@ -49,7 +49,7 @@ if __name__ == "__main__":
     communicator = serial_port
     pkt_seq = 0
 
-    rgbd_camera = config.RGBD_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
+    autoaim_camera = config.AUTOAIM_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
 
     # color buffer which retrieves enemy color from STM32
     my_color_buffer = serial_circular_buffer()
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     while True:
         start = time.time()
-        frame, depth = rgbd_camera.get_frame()
+        frame = autoaim_camera.get_frame()
 
         if communicator is not None:
             if (communicator.inWaiting() > 0):
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         elapsed = time.time()-start
         
         # Tracking and filtering
-        ret_dict = aimer.process_one(pred, enemy_team, frame, depth)
+        ret_dict = aimer.process_one(pred, enemy_team, frame)
 
         show_frame = frame.copy()
 

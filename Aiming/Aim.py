@@ -8,14 +8,14 @@ class Aim:
     def __init__(self):
         self.tracker = basic_tracker()
 
-    def process_one(self, pred_list, enemy_team, rgb_img, depth_map):
+    def process_one(self, pred_list, enemy_team, rgb_img):
         assert enemy_team in ['blue', 'red']
 
         pred_list = self.tracker.fix_prediction(pred_list)
 
-        self.tracker.register_one(pred_list, enemy_team, rgb_img, depth_map)
+        self.tracker.register_one(pred_list, enemy_team, rgb_img)
 
-        closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, depth_map)
+        closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, rgb_img)
         if closet_pred is None:
             return None
         name, confidence, bbox = closet_pred
@@ -53,13 +53,20 @@ class Aim:
             # TODO: compute a range table
             return (yaw_diff, pitch_diff)
     
-    def get_closet_pred(self, pred_list, enemy_team, depth_map):
+    def get_closet_pred(self, pred_list, enemy_team, rgb_img):
+        '''Get the closet prediction to camera focal point'''
+        # TODO: instead of camera focal point; calibrate closet pred to operator view
+        H, W, C = rgb_img.shape
+        focal_y = H / 2
+        focal_x = W / 2
         closet_pred = None
         closet_dist = None # Cloest to camera in z-axis
         obj_of_interest = [f"armor_{enemy_team}"]
+        closet_dist = 99999999
         for name, conf, bbox in pred_list:
             if name not in obj_of_interest: continue
-            cur_dist = Utils.estimate_target_depth(bbox, depth_map)
+            center_x, center_y, width, height = bbox
+            cur_dist = (center_x - focal_x)**2 + (center_y - focal_y)**2
             if closet_pred is None:
                 closet_pred = (name, conf, bbox)
                 closet_dist = cur_dist
@@ -71,7 +78,7 @@ class Aim:
 
     @staticmethod
     def get_rotation_angle(bbox_center_x, bbox_center_y):
-        yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.RGBD_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
-        pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * (config.RGBD_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
+        yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.AUTOAIM_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
+        pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * (config.AUTOAIM_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
 
         return yaw_diff, pitch_diff
