@@ -1,4 +1,5 @@
-# iRM_Vision_2022
+# iRM_Vision_2023
+
 repo for iRM vision.
 
 ## Data preparing
@@ -25,10 +26,4 @@ Please follow instruction from the RMCV101 repo [here](https://github.com/illini
 - vision.py            --> vision driver
 - config.py            --> global config (parameters and class instance)
 ```
-
-## Dependencies:
-- [Darknet](https://github.com/pjreddie/darknet)
-  - OpenCV
-  - CUDA
-- Python 
 
