@@ -2,12 +2,19 @@ import numpy as np
 import config
 import Utils
 
+from .Tracking import basic_tracker
+
 class Aim:
     def __init__(self):
-        pass
+        self.tracker = basic_tracker()
 
-    def process_one(self, pred_list, enemy_team, depth_map):
+    def process_one(self, pred_list, enemy_team, rgb_img, depth_map):
         assert enemy_team in ['blue', 'red']
+
+        pred_list = self.tracker.fix_prediction(pred_list)
+
+        self.tracker.register_one(pred_list, enemy_team, rgb_img, depth_map)
+
         closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, depth_map)
         if closet_pred is None:
             return None
@@ -51,12 +58,7 @@ class Aim:
         closet_dist = None # Cloest to camera in z-axis
         obj_of_interest = [f"armor_{enemy_team}"]
         for name, conf, bbox in pred_list:
-            # name from C++ string is in bytes; decoding is needed
-            if isinstance(name, bytes):
-                name_str = name.decode('utf-8')
-            else:
-                name_str = name
-            if name_str not in obj_of_interest: continue
+            if name not in obj_of_interest: continue
             cur_dist = Utils.estimate_target_depth(bbox, depth_map)
             if closet_pred is None:
                 closet_pred = (name, conf, bbox)

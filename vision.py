@@ -71,9 +71,20 @@ if __name__ == "__main__":
         model.change_color(enemy_team)
 
         pred = model.detect(frame)
+
+        for i in range(len(pred)):
+            name, conf, bbox = pred[i]
+            # name from C++ string is in bytes; decoding is needed
+            if isinstance(name, bytes):
+                name_str = name.decode('utf-8')
+            else:
+                name_str = name
+            pred[i] = (name_str, conf, bbox)
+
         elapsed = time.time()-start
         
-        ret_dict = aimer.process_one(pred, enemy_team, depth)
+        # Tracking and filtering
+        ret_dict = aimer.process_one(pred, enemy_team, frame, depth)
 
         show_frame = frame.copy()
 
