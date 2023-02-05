@@ -38,8 +38,8 @@ def create_packet(header, seq_num, yaw_offset, pitch_offset):
     assert seq_num >= 0 and seq_num < 2**32 - 1 # uint32
     packet += seq_num.to_bytes(4, 'big')
     # YAW/PITCH offset should not be too high
-    assert yaw_offset >= -config.RGBD_CAMERA.YAW_FOV_HALF and yaw_offset <= config.RGBD_CAMERA.YAW_FOV_HALF
-    assert pitch_offset >= -config.RGBD_CAMERA.PITCH_FOV_HALF and pitch_offset <= config.RGBD_CAMERA.PITCH_FOV_HALF
+    assert yaw_offset >= -config.AUTOAIM_CAMERA.YAW_FOV_HALF and yaw_offset <= config.AUTOAIM_CAMERA.YAW_FOV_HALF
+    assert pitch_offset >= -config.AUTOAIM_CAMERA.PITCH_FOV_HALF and pitch_offset <= config.AUTOAIM_CAMERA.PITCH_FOV_HALF
     discrete_yaw_offset = int(yaw_offset * 100000)
     discrete_pitch_offset = int(pitch_offset * 100000)
     packet += (discrete_yaw_offset & 0xFFFFFFFF).to_bytes(4, 'big')

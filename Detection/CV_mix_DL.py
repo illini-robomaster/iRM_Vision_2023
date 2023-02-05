@@ -110,6 +110,7 @@ class armor_class:
         assert light1.color == light2.color
         assert light1.color == color
         self.color = color
+        self.confidence = 0.0
         
         if light1.center_x < light2.center_x:
             self.left_light = light1
