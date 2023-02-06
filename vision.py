@@ -8,8 +8,6 @@ import config
 
 DEFAULT_ENEMY_TEAM = 'red'
 
-DEBUG_DISPLAY = True
-
 class serial_circular_buffer:
     def __init__(self, buffer_size=10):
         self.buffer = []
@@ -82,6 +80,18 @@ if __name__ == "__main__":
             pred[i] = (name_str, conf, bbox)
 
         elapsed = time.time()-start
+
+        if config.DEBUG_DISPLAY:
+            viz_frame = frame.copy()
+            for name, conf, bbox in pred:
+                lower_x = int(bbox[0] - bbox[2] / 2)
+                lower_y = int(bbox[1] - bbox[3] / 2)
+                upper_x = int(bbox[0] + bbox[2] / 2)
+                upper_y = int(bbox[1] + bbox[3] / 2)
+                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+            cv2.imshow('all_detected', viz_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                exit(0)
         
         # Tracking and filtering
         ret_dict = aimer.process_one(pred, enemy_team, frame)
@@ -96,12 +106,12 @@ if __name__ == "__main__":
         else:
             show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
+            packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)g
         
-        if DEBUG_DISPLAY:
+        if config.DEBUG_DISPLAY:
             print('----------------\n',pred)
             print('fps:',1./elapsed)
-            cv2.imshow('pred', show_frame)
+            cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
 
