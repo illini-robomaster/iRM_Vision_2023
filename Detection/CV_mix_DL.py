@@ -228,7 +228,7 @@ class cv_armor_proposer(object):
 
     def find_lights(self, rgb_img, binary_img):
         # Use difference of color to handle white light
-        # TODO: move these logics to preprocess
+        # TODO separate contours computation and use NMS w/ light filtering
         if self.detect_color == RED:
             color_diff = rgb_img[:,:,0].astype(int) - rgb_img[:,:,2]
             color_diff[color_diff < 0] = 0
@@ -240,8 +240,9 @@ class cv_armor_proposer(object):
             color_diff = color_diff.astype(np.uint8)
             _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
         
-        cv2.imshow('color', color_bin)
-        cv2.waitKey(1)
+        if self.CFG.DEBUG_DISPLAY:
+            cv2.imshow('color', color_bin)
+            cv2.waitKey(1)
 
         combined_img = cv2.bitwise_or(binary_img, color_bin)
         contours, _ = cv2.findContours(combined_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

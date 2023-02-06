@@ -106,7 +106,7 @@ if __name__ == "__main__":
         else:
             show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)g
+            packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
         
         if config.DEBUG_DISPLAY:
             print('----------------\n',pred)
