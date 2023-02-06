@@ -3,6 +3,10 @@ import cv2
 import os
 import time
 
+# Internal ENUM
+RED = 0
+BLUE = 1
+
 def auto_align_brightness(img, target_v=50):
     # Only decrease!
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -30,9 +34,10 @@ def auto_align_brightness(img, target_v=50):
         return img
 
 class cv_mix_dl_detector:
-    def __init__(self, detect_color, model_path='fc.onnx'):
-        self.armor_proposer = cv_armor_proposer(detect_color)
-        self.digit_classifier = dl_digit_classifier(model_path)
+    def __init__(self, config, detect_color, model_path='fc.onnx'):
+        self.CFG = config
+        self.armor_proposer = cv_armor_proposer(self.CFG, detect_color)
+        self.digit_classifier = dl_digit_classifier(self.CFG, model_path)
         self.change_color(detect_color)
     
     def detect(self, rgb_img):
@@ -159,13 +164,16 @@ class armor_class:
         self.number_image = cv2.cvtColor(self.number_image, cv2.COLOR_RGB2GRAY)
         thres, self.number_image = cv2.threshold(self.number_image, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-class cv_armor_proposer:
+class cv_armor_proposer(object):
     # Hyperparameters
     MIN_LIGHTNESS = 160
+    LUMINANCE_THRES = 90
 
     LIGHT_MIN_RATIO = 0.1
     LIGHT_MAX_RATIO = 0.55
     LIGHT_MAX_ANGLE = 40.0
+
+    LIGHT_AREA_THRES = 50
 
     ARMOR_MIN_LIGHT_RATIO = 0.6
     ARMOR_MIN_SMALL_CENTER_DISTANCE = 1.3
@@ -177,13 +185,34 @@ class cv_armor_proposer:
 
     armor_max_angle = 35.0
 
-    def __init__(self, detect_color):
+    def __init__(self, config, detect_color):
+        self.CFG = config
         self.detect_color = detect_color
     
     def __call__(self, rgb_img):
         binary_img = self.preprocess(rgb_img)
+        if self.CFG.DEBUG_DISPLAY:
+            # visualize binary image
+            cv2.imshow('binary', binary_img)
+            cv2.waitKey(1)
+
         light_list = self.find_lights(rgb_img, binary_img)
+        if self.CFG.DEBUG_DISPLAY:
+            viz_img = rgb_img.copy()
+            # visualize lights
+            for light in light_list:
+                cv2.rectangle(viz_img, (int(light.top[0]), int(light.top[1])), (int(light.btm[0]), int(light.btm[1])), (0, 255, 0), 2)
+            cv2.imshow('lights', viz_img)
+            cv2.waitKey(1)
+
         armor_list = self.match_lights(light_list)
+        if self.CFG.DEBUG_DISPLAY:
+            viz_img = rgb_img.copy()
+            # visualize armors
+            for armor in armor_list:
+                cv2.rectangle(viz_img, (int(armor.left_light.top[0]), int(armor.left_light.top[1])), (int(armor.right_light.btm[0]), int(armor.right_light.btm[1])), (0, 255, 0), 2)
+            cv2.imshow('armors', viz_img)
+            cv2.waitKey(1)
         
         return armor_list
     
@@ -198,7 +227,25 @@ class cv_armor_proposer:
         return binary_img
 
     def find_lights(self, rgb_img, binary_img):
-        contours, hierarchy = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Use difference of color to handle white light
+        # TODO: move these logics to preprocess
+        if self.detect_color == RED:
+            color_diff = rgb_img[:,:,0].astype(int) - rgb_img[:,:,2]
+            color_diff[color_diff < 0] = 0
+            color_diff = color_diff.astype(np.uint8)
+            _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
+        else:
+            color_diff = rgb_img[:,:,2].astype(int) - rgb_img[:,:,0]
+            color_diff[color_diff < 0] = 0
+            color_diff = color_diff.astype(np.uint8)
+            _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
+        
+        cv2.imshow('color', color_bin)
+        cv2.waitKey(1)
+
+        combined_img = cv2.bitwise_or(binary_img, color_bin)
+        contours, _ = cv2.findContours(combined_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
         light_list = []
         start_cp = time.time()
         for contour in contours:
@@ -213,6 +260,9 @@ class cv_armor_proposer:
             bounding_rect = cv2.boundingRect(contour)
 
             x, y, w, h = bounding_rect
+
+            if w * h < self.LIGHT_AREA_THRES:
+                continue
 
             if 0 <= x and 0 <= w and (x + w) <= rgb_img.shape[1] and 0 < y and 0 < h and y + h <=rgb_img.shape[0]:
                 sum_r = 0
@@ -314,7 +364,8 @@ class dl_digit_classifier:
     LABEL_NAMES_LIST = np.array(['B', '1', '2', '3', '4', '5', 'G', 'O', 'N'])
     CLASSIFIER_THRESHOLD = 0.7
 
-    def __init__(self, model_path):
+    def __init__(self, config, model_path):
+        self.CFG = config
         self.net = cv2.dnn.readNetFromONNX(model_path)
     
     @staticmethod

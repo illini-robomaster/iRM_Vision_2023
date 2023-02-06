@@ -41,7 +41,7 @@ class serial_circular_buffer:
         return self.default_color
 
 if __name__ == "__main__":
-    model = cv_mix_dl_detector(DEFAULT_ENEMY_TEAM)
+    model = cv_mix_dl_detector(config, DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim()
     communicator = serial_port

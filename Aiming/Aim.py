@@ -11,9 +11,11 @@ class Aim:
     def process_one(self, pred_list, enemy_team, rgb_img):
         assert enemy_team in ['blue', 'red']
 
-        pred_list = self.tracker.fix_prediction(pred_list)
+        # FIXME: tracker is commented out for now because it works only for one target
+        # TODO: add HUNGARIAN algorithm to match predictions in tracker!
+        # pred_list = self.tracker.fix_prediction(pred_list)
 
-        self.tracker.register_one(pred_list, enemy_team, rgb_img)
+        # self.tracker.register_one(pred_list, enemy_team, rgb_img)
 
         closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, rgb_img)
         if closet_pred is None:
