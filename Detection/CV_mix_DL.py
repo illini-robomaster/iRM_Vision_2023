@@ -234,16 +234,19 @@ class cv_armor_proposer(object):
             color_diff[color_diff < 0] = 0
             color_diff = color_diff.astype(np.uint8)
             _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
+            color_contours, _ = cv2.findContours(color_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         else:
             color_diff = rgb_img[:,:,2].astype(int) - rgb_img[:,:,0]
             color_diff[color_diff < 0] = 0
             color_diff = color_diff.astype(np.uint8)
             _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
-        
+            color_contours, _ = cv2.findContours(color_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
         if self.CFG.DEBUG_DISPLAY:
             cv2.imshow('color', color_bin)
             cv2.waitKey(1)
 
+        # TODO: use NMS here
         combined_img = cv2.bitwise_or(binary_img, color_bin)
         contours, _ = cv2.findContours(combined_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
