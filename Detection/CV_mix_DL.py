@@ -234,6 +234,28 @@ class cv_armor_proposer(object):
         thres, binary_img = cv2.threshold(gray_img, self.MIN_LIGHTNESS, 255, cv2.THRESH_BINARY)
 
         return binary_img
+    
+    def filter_contours_rects(self, contours, rects, rgb_img):
+        """
+        Filter out contours that are too small or too large
+        """
+        filtered_contours = []
+        filtered_rects = []
+        assert len(contours) == len(rects)
+        for i in range(len(rects)):
+            x, y, w, h = rects[i]
+            # Area test
+            if w * h < self.LIGHT_AREA_THRES:
+                continue
+            
+            # Color test
+            if not color_test(rgb_img, rects[i], self.detect_color):
+                continue
+
+            filtered_rects.append(rects[i])
+            filtered_contours.append(contours[i])
+        
+        return filtered_contours, filtered_rects
 
     def find_lights(self, rgb_img, binary_img):
         bin_contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -263,9 +285,9 @@ class cv_armor_proposer(object):
         bin_rects = [cv2.boundingRect(contour) for contour in bin_contours]
         col_rects = [cv2.boundingRect(contour) for contour in color_contours]
 
-        # Apply color test here
-        bin_rects = [r for r in bin_rects if color_test(rgb_img, r, self.detect_color)]
-        col_rects = [r for r in col_rects if color_test(rgb_img, r, self.detect_color)]
+        # Basic filtering for contours and rects
+        bin_contours, bin_rects = self.filter_contours_rects(bin_contours, bin_rects, rgb_img)
+        color_contours, col_rects = self.filter_contours_rects(color_contours, col_rects, rgb_img)
 
         # Apply NMS to contours from binary image and color difference image
         # COLOR contours are generally less reliable
@@ -289,18 +311,11 @@ class cv_armor_proposer(object):
         final_contours.extend(bin_contours)
 
         light_list = []
-        start_cp = time.time()
         for contour in final_contours:
             light = cv2.minAreaRect(contour)
             light = light_class(light)
+
             if not self.is_light(light):
-                continue
-
-            bounding_rect = cv2.boundingRect(contour)
-
-            x, y, w, h = bounding_rect
-
-            if w * h < self.LIGHT_AREA_THRES:
                 continue
 
             light.color = self.detect_color
@@ -323,8 +338,8 @@ class cv_armor_proposer(object):
                 light1 = light_list[i]
                 light2 = light_list[j]
 
-                if light1.color != self.detect_color or light2.color != self.detect_color:
-                    continue
+                assert light1.color == self.detect_color
+                assert light2.color == self.detect_color
 
                 if self.contain_light(light1, light2, light_list):
                     continue
