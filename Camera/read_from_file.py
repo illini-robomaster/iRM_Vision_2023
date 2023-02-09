@@ -1,5 +1,6 @@
 # Read from file
 import sys
+import time
 import numpy as np
 import cv2
 import Utils
@@ -23,7 +24,14 @@ class fake_camera(object):
 
         self.alive = True # init to True
 
+        # Timing and frame counter are always in place for devlopment purpose
+        self.timing = None
+        self.frame_cnt = 0
+
     def get_frame(self):
+        if self.timing is None:
+            self.timing = time.time()
+
         if not self.cap.isOpened():
             self.alive = False
         
@@ -33,8 +41,13 @@ class fake_camera(object):
             self.alive = False
         
         if not self.alive:
+            print("Total frames: {}".format(self.frame_cnt))
+            print("Total time: {}".format(time.time() - self.timing))
+            print("FPS: {}".format(self.frame_cnt / (time.time() - self.timing)))
             raise Exception("Video file exhausted")
         
         frame = cv2.resize(frame, (self.width, self.height))
+
+        self.frame_cnt += 1
 
         return frame
