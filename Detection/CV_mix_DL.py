@@ -33,6 +33,15 @@ def auto_align_brightness(img, target_v=50):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+def color_test(rgb_img, rect, color):
+    rgb_roi = rgb_img[rect[1]:rect[1]+rect[3], rect[0]:rect[0]+rect[2]]
+    sum_r = np.sum(rgb_roi[:,:,0])
+    sum_b = np.sum(rgb_roi[:,:,2])
+    if color == RED:
+        return sum_r >= sum_b
+    else:
+        return sum_b >= sum_r
+
 class cv_mix_dl_detector:
     def __init__(self, config, detect_color, model_path='fc.onnx'):
         self.CFG = config
@@ -251,12 +260,15 @@ class cv_armor_proposer(object):
         bin_contours = [contour for contour in bin_contours if contour.shape[0] >= 5]
         color_contours = [contour for contour in color_contours if contour.shape[0] >= 5]
 
-        # TODO: apply color test here
-
-        # Apply NMS to contours from binary image and color difference image
-        # COLOR contours are less reliable
         bin_rects = [cv2.boundingRect(contour) for contour in bin_contours]
         col_rects = [cv2.boundingRect(contour) for contour in color_contours]
+
+        # Apply color test here
+        bin_rects = [r for r in bin_rects if color_test(rgb_img, r, self.detect_color)]
+        col_rects = [r for r in col_rects if color_test(rgb_img, r, self.detect_color)]
+
+        # Apply NMS to contours from binary image and color difference image
+        # COLOR contours are generally less reliable
         final_contours = []
         for col_rect, col_contour in zip(col_rects, color_contours):
             append_flag = True
@@ -291,25 +303,8 @@ class cv_armor_proposer(object):
             if w * h < self.LIGHT_AREA_THRES:
                 continue
 
-            if 0 <= x and 0 <= w and (x + w) <= rgb_img.shape[1] and 0 < y and 0 < h and y + h <=rgb_img.shape[0]:
-                sum_r = 0
-                sum_b = 0
-
-                roi = rgb_img[y:y+h,x:x+w]
-
-                for i in range(roi.shape[0]):
-                    for j in range(roi.shape[1]):
-                        if cv2.pointPolygonTest(contour, (j + x, i + y), False):
-                            # point is inside contour
-                            sum_r += roi[i,j,0]
-                            sum_b += roi[i,j,2]
-
-                if sum_r > sum_b:
-                    my_color = 0 # RED
-                else:
-                    my_color = 1 # BLUE
-                light.color = my_color
-                light_list.append(light)
+            light.color = self.detect_color
+            light_list.append(light)
         return light_list
     
     def is_light(self, light):
