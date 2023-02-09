@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import os
 import time
-
+from IPython import embed
 # Internal ENUM
 RED = 0
 BLUE = 1
@@ -227,6 +227,7 @@ class cv_armor_proposer(object):
         return binary_img
 
     def find_lights(self, rgb_img, binary_img):
+        bin_contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # Use difference of color to handle white light
         # TODO separate contours computation and use NMS w/ light filtering
         if self.detect_color == RED:
@@ -245,17 +246,39 @@ class cv_armor_proposer(object):
         if self.CFG.DEBUG_DISPLAY:
             cv2.imshow('color', color_bin)
             cv2.waitKey(1)
+        
+        # Preprocess contours for early filtering
+        bin_contours = [contour for contour in bin_contours if contour.shape[0] >= 5]
+        color_contours = [contour for contour in color_contours if contour.shape[0] >= 5]
 
-        # TODO: use NMS here
-        combined_img = cv2.bitwise_or(binary_img, color_bin)
-        contours, _ = cv2.findContours(combined_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # TODO: apply color test here
+
+        # Apply NMS to contours from binary image and color difference image
+        # COLOR contours are less reliable
+        bin_rects = [cv2.boundingRect(contour) for contour in bin_contours]
+        col_rects = [cv2.boundingRect(contour) for contour in color_contours]
+        final_contours = []
+        for col_rect, col_contour in zip(col_rects, color_contours):
+            append_flag = True
+            for bin_rect in bin_rects:
+                # Compute rectangle overlap
+                x_overlap = max(0, min(bin_rect[0] + bin_rect[2], col_rect[0] + col_rect[2]) - max(bin_rect[0], col_rect[0]))
+                y_overlap = max(0, min(bin_rect[1] + bin_rect[3], col_rect[1] + col_rect[3]) - max(bin_rect[1], col_rect[1]))
+                overlap = x_overlap * y_overlap
+                min_area = min(bin_rect[2] * bin_rect[3], col_rect[2] * col_rect[3])
+                normalized_overlap = overlap / min_area
+                NMS_THRES = 0.5
+                if normalized_overlap > NMS_THRES:
+                    # If overlap is too large, discard color contour
+                    append_flag = False
+                    break
+            if append_flag:
+                final_contours.append(col_contour)
+        final_contours.extend(bin_contours)
 
         light_list = []
         start_cp = time.time()
-        for contour in contours:
-            if contour.shape[0] < 5:
-                continue
-
+        for contour in final_contours:
             light = cv2.minAreaRect(contour)
             light = light_class(light)
             if not self.is_light(light):
