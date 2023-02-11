@@ -8,7 +8,7 @@ We recorded some demo videos to demo auto-aiming capabilities of our robots,
 which is located under the folder `./large_data/`.
 However, due to the large sizes of the video, it's inappropriate to directly
 upload them to GitHub. Hence, to acquire theese sample videos, please download
-them at the [UofI box][https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e].
+them at the [UofI box](https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e).
 
 ## Dependencies
 

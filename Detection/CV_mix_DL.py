@@ -260,7 +260,6 @@ class cv_armor_proposer(object):
     def find_lights(self, rgb_img, binary_img):
         bin_contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # Use difference of color to handle white light
-        # TODO separate contours computation and use NMS w/ light filtering
         if self.detect_color == RED:
             color_diff = rgb_img[:,:,0].astype(int) - rgb_img[:,:,2]
             color_diff[color_diff < 0] = 0
