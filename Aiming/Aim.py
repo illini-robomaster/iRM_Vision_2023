@@ -5,23 +5,23 @@ import Utils
 from .Tracking import basic_tracker
 
 class Aim:
-    def __init__(self):
-        self.tracker = basic_tracker()
+    def __init__(self, config):
+        self.CFG = config
+        self.tracker = basic_tracker(self.CFG)
 
     def process_one(self, pred_list, enemy_team, rgb_img):
         assert enemy_team in ['blue', 'red']
 
-        # FIXME: tracker is commented out for now because it works only for one target
-        # TODO: add HUNGARIAN algorithm to match predictions in tracker!
-        # pred_list = self.tracker.fix_prediction(pred_list)
+        # TODO: use assertion to check enemy_team
 
-        # self.tracker.register_one(pred_list, enemy_team, rgb_img)
+        final_bbox_list, final_id_list = self.tracker.process_one(pred_list, enemy_team, rgb_img)
 
-        closet_pred, closet_dist = self.get_closet_pred(pred_list, enemy_team, rgb_img)
+        # TODO: integrate this into tracking for consistent tracking
+        closet_pred, closet_dist = self.get_closet_pred(final_bbox_list, rgb_img)
+
         if closet_pred is None:
             return None
-        name, confidence, bbox = closet_pred
-        center_x, center_y, width, height = bbox
+        center_x, center_y, width, height = closet_pred
 
         # Get yaw/pitch differences in radians
         yaw_diff, pitch_diff = self.get_rotation_angle(center_x, center_y)
@@ -33,6 +33,8 @@ class Aim:
             'pitch_diff': calibrated_pitch_diff,
             'center_x': center_x,
             'center_y': center_y,
+            'final_bbox_list': final_bbox_list,
+            'final_id_list': final_id_list,
         }
     
     def posterior_calibration(self, yaw_diff, pitch_diff, distance):
@@ -55,7 +57,7 @@ class Aim:
             # TODO: compute a range table
             return (yaw_diff, pitch_diff)
     
-    def get_closet_pred(self, pred_list, enemy_team, rgb_img):
+    def get_closet_pred(self, bbox_list, rgb_img):
         '''Get the closet prediction to camera focal point'''
         # TODO: instead of camera focal point; calibrate closet pred to operator view
         H, W, C = rgb_img.shape
@@ -63,18 +65,16 @@ class Aim:
         focal_x = W / 2
         closet_pred = None
         closet_dist = None # Cloest to camera in z-axis
-        obj_of_interest = [f"armor_{enemy_team}"]
         closet_dist = 99999999
-        for name, conf, bbox in pred_list:
-            if name not in obj_of_interest: continue
+        for bbox in bbox_list:
             center_x, center_y, width, height = bbox
             cur_dist = (center_x - focal_x)**2 + (center_y - focal_y)**2
             if closet_pred is None:
-                closet_pred = (name, conf, bbox)
+                closet_pred = bbox
                 closet_dist = cur_dist
             else:
                 if cur_dist < closet_dist:
-                    closet_pred = (name, conf, bbox)
+                    closet_pred = bbox
                     closet_dist = cur_dist
         return closet_pred, closet_dist
 

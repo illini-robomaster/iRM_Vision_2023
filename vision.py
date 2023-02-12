@@ -43,7 +43,7 @@ class serial_circular_buffer:
 if __name__ == "__main__":
     model = cv_mix_dl_detector(config, DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
-    aimer = Aim()
+    aimer = Aim(config)
     communicator = serial_port
     pkt_seq = 0
 
@@ -65,6 +65,8 @@ if __name__ == "__main__":
                 byte_array = communicator.read(communicator.inWaiting())
                 my_color_buffer.receive(byte_array)
         
+        # TODO: add a global reset function if enemy functions change
+        # (e.g., clear the buffer in the armor tracker)
         enemy_team = my_color_buffer.get_enemy_color()
         model.change_color(enemy_team)
 
@@ -83,7 +85,7 @@ if __name__ == "__main__":
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
-            for name, conf, bbox in pred:
+            for _, _, bbox in pred:
                 lower_x = int(bbox[0] - bbox[2] / 2)
                 lower_y = int(bbox[1] - bbox[3] / 2)
                 upper_x = int(bbox[0] + bbox[2] / 2)
@@ -94,8 +96,26 @@ if __name__ == "__main__":
                 exit(0)
         
         # Tracking and filtering
+        # Pour all predictions into the aimer, which returns relative angles
         ret_dict = aimer.process_one(pred, enemy_team, frame)
 
+        if config.DEBUG_DISPLAY:
+            viz_frame = frame.copy()
+            for i in range(len(ret_dict['final_bbox_list'])):
+                bbox = ret_dict['final_bbox_list'][i]
+                unique_id = ret_dict['final_id_list'][i]
+                lower_x = int(bbox[0] - bbox[2] / 2)
+                lower_y = int(bbox[1] - bbox[3] / 2)
+                upper_x = int(bbox[0] + bbox[2] / 2)
+                upper_y = int(bbox[1] + bbox[3] / 2)
+                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+                viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.imshow('filtered_detected', viz_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                exit(0)
+
+        # TODO: put this into debug display
         show_frame = frame.copy()
 
         if ret_dict:

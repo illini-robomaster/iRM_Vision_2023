@@ -44,6 +44,7 @@ def color_test(rgb_img, rect, color):
 
 class cv_mix_dl_detector:
     def __init__(self, config, detect_color, model_path='fc.onnx'):
+        # TODO: fix config parameter in ipython notebook
         self.CFG = config
         self.armor_proposer = cv_armor_proposer(self.CFG, detect_color)
         self.digit_classifier = dl_digit_classifier(self.CFG, model_path)
