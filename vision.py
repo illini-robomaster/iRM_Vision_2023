@@ -40,7 +40,7 @@ class serial_circular_buffer:
         
         return self.default_color
 
-if __name__ == "__main__":
+def main():
     model = cv_mix_dl_detector(config, DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim(config)
@@ -139,3 +139,6 @@ if __name__ == "__main__":
             communicator.write(packet)
 
         pkt_seq += 1
+
+if __name__ == "__main__":
+    main()
