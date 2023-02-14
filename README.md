@@ -14,6 +14,14 @@ them at the [UofI box](https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e).
 
 Please follow instruction from the RMCV101 repo [here](https://github.com/illini-robomaster/RM_CV_101/blob/master/INSTALL.md).
 
+## TODOs
+
+- Implement a more robust tracker (e.g., EKF / Kalman)
+- Implement depth estimators (either use D455 or estimate from monocular cameras)
+- Optimize code efficiency on Jetson
+- Implement communication protocol and test with embedded team
+- Implememt MDVS camera driver in Python
+
 ## File Structure
 
 ```
