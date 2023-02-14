@@ -35,3 +35,6 @@ Please follow instruction from the RMCV101 repo [here](https://github.com/illini
 - config.py            --> global config (parameters and class instance)
 ```
 
+## CHANGLELOG
+
+2023-02-14 v0.0.1 release for 2023 season midterm. See notes [here](https://github.com/illini-robomaster/iRM_Vision_2023/pull/1).
