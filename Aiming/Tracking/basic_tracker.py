@@ -52,7 +52,7 @@ class basic_tracker(object):
 
     It memorizes the state of last two predictions and do linear extrapolation
     '''
-    SE_THRESHOLD = 1800 # (30, 30) pixels away
+    SE_THRESHOLD = 3200 # (40, 40) pixels away
 
     def __init__(self, config):
         self.CFG = config
@@ -69,7 +69,7 @@ class basic_tracker(object):
             lower_y = int(c_y - h / 2)
             upper_y = int(c_y + h / 2)
             roi = rgb_img[lower_y:upper_y,lower_x:upper_x]
-            new_armors.append(tracked_armor(bbox, roi, self.frame_tick, self.id_gen.get_id()))
+            new_armors.append(tracked_armor(bbox, roi, self.frame_tick, -1))
 
         if len(self.active_armors) > 0:
             # Try to associate with current armors
@@ -87,6 +87,9 @@ class basic_tracker(object):
                     new_armors[i] = None
         
         new_armors = [i for i in new_armors if i is not None]
+
+        for n in new_armors:
+            n.armor_id = self.id_gen.get_id()
 
         # Maintain current buffer. If an armor has not been observed by 10 frames, it is dropped
         self.active_armors = [i for i in self.active_armors
