@@ -2,6 +2,10 @@ import numpy as np
 import cv2
 import os
 import time
+from IPython import embed
+# Internal ENUM
+RED = 0
+BLUE = 1
 
 def auto_align_brightness(img, target_v=50):
     # Only decrease!
@@ -20,12 +24,30 @@ def auto_align_brightness(img, target_v=50):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
     else:
+        # brighten
+        value = -v_diff
+        # needs lower brightness
+        v[v > (255 - value)] = 255
+        v[v <= (255 - value)] += value
+        final_hsv = cv2.merge((h, s, v))
+        img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+def color_test(rgb_img, rect, color):
+    rgb_roi = rgb_img[rect[1]:rect[1]+rect[3], rect[0]:rect[0]+rect[2]]
+    sum_r = np.sum(rgb_roi[:,:,0])
+    sum_b = np.sum(rgb_roi[:,:,2])
+    if color == RED:
+        return sum_r >= sum_b
+    else:
+        return sum_b >= sum_r
+
 class cv_mix_dl_detector:
-    def __init__(self, detect_color, model_path='fc.onnx'):
-        self.armor_proposer = cv_armor_proposer(detect_color)
-        self.digit_classifier = dl_digit_classifier(model_path)
+    def __init__(self, config, detect_color, model_path='fc.onnx'):
+        # TODO: fix config parameter in ipython notebook
+        self.CFG = config
+        self.armor_proposer = cv_armor_proposer(self.CFG, detect_color)
+        self.digit_classifier = dl_digit_classifier(self.CFG, model_path)
         self.change_color(detect_color)
     
     def detect(self, rgb_img):
@@ -103,6 +125,7 @@ class armor_class:
         assert light1.color == light2.color
         assert light1.color == color
         self.color = color
+        self.confidence = 0.0
         
         if light1.center_x < light2.center_x:
             self.left_light = light1
@@ -151,13 +174,16 @@ class armor_class:
         self.number_image = cv2.cvtColor(self.number_image, cv2.COLOR_RGB2GRAY)
         thres, self.number_image = cv2.threshold(self.number_image, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-class cv_armor_proposer:
+class cv_armor_proposer(object):
     # Hyperparameters
     MIN_LIGHTNESS = 160
+    LUMINANCE_THRES = 90
 
     LIGHT_MIN_RATIO = 0.1
     LIGHT_MAX_RATIO = 0.55
     LIGHT_MAX_ANGLE = 40.0
+
+    LIGHT_AREA_THRES = 50
 
     ARMOR_MIN_LIGHT_RATIO = 0.6
     ARMOR_MIN_SMALL_CENTER_DISTANCE = 1.3
@@ -169,13 +195,34 @@ class cv_armor_proposer:
 
     armor_max_angle = 35.0
 
-    def __init__(self, detect_color):
+    def __init__(self, config, detect_color):
+        self.CFG = config
         self.detect_color = detect_color
     
     def __call__(self, rgb_img):
         binary_img = self.preprocess(rgb_img)
+        if self.CFG.DEBUG_DISPLAY:
+            # visualize binary image
+            cv2.imshow('binary', binary_img)
+            cv2.waitKey(1)
+
         light_list = self.find_lights(rgb_img, binary_img)
+        if self.CFG.DEBUG_DISPLAY:
+            viz_img = rgb_img.copy()
+            # visualize lights
+            for light in light_list:
+                cv2.rectangle(viz_img, (int(light.top[0]), int(light.top[1])), (int(light.btm[0]), int(light.btm[1])), (0, 255, 0), 2)
+            cv2.imshow('lights', viz_img)
+            cv2.waitKey(1)
+
         armor_list = self.match_lights(light_list)
+        if self.CFG.DEBUG_DISPLAY:
+            viz_img = rgb_img.copy()
+            # visualize armors
+            for armor in armor_list:
+                cv2.rectangle(viz_img, (int(armor.left_light.top[0]), int(armor.left_light.top[1])), (int(armor.right_light.btm[0]), int(armor.right_light.btm[1])), (0, 255, 0), 2)
+            cv2.imshow('armors', viz_img)
+            cv2.waitKey(1)
         
         return armor_list
     
@@ -188,43 +235,91 @@ class cv_armor_proposer:
         thres, binary_img = cv2.threshold(gray_img, self.MIN_LIGHTNESS, 255, cv2.THRESH_BINARY)
 
         return binary_img
-
-    def find_lights(self, rgb_img, binary_img):
-        contours, hierarchy = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        light_list = []
-        start_cp = time.time()
-        for contour in contours:
-            if contour.shape[0] < 5:
+    
+    def filter_contours_rects(self, contours, rects, rgb_img):
+        """
+        Filter out contours that are too small or too large
+        """
+        filtered_contours = []
+        filtered_rects = []
+        assert len(contours) == len(rects)
+        for i in range(len(rects)):
+            x, y, w, h = rects[i]
+            # Area test
+            if w * h < self.LIGHT_AREA_THRES:
+                continue
+            
+            # Color test
+            if not color_test(rgb_img, rects[i], self.detect_color):
                 continue
 
+            filtered_rects.append(rects[i])
+            filtered_contours.append(contours[i])
+        
+        return filtered_contours, filtered_rects
+
+    def find_lights(self, rgb_img, binary_img):
+        bin_contours, _ = cv2.findContours(binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Use difference of color to handle white light
+        if self.detect_color == RED:
+            color_diff = rgb_img[:,:,0].astype(int) - rgb_img[:,:,2]
+            color_diff[color_diff < 0] = 0
+            color_diff = color_diff.astype(np.uint8)
+            _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
+            color_contours, _ = cv2.findContours(color_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        else:
+            color_diff = rgb_img[:,:,2].astype(int) - rgb_img[:,:,0]
+            color_diff[color_diff < 0] = 0
+            color_diff = color_diff.astype(np.uint8)
+            _, color_bin = cv2.threshold(color_diff, self.LUMINANCE_THRES, 255, cv2.THRESH_BINARY)
+            color_contours, _ = cv2.findContours(color_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+        if self.CFG.DEBUG_DISPLAY:
+            cv2.imshow('color', color_bin)
+            cv2.waitKey(1)
+        
+        # Preprocess contours for early filtering
+        bin_contours = [contour for contour in bin_contours if contour.shape[0] >= 5]
+        color_contours = [contour for contour in color_contours if contour.shape[0] >= 5]
+
+        bin_rects = [cv2.boundingRect(contour) for contour in bin_contours]
+        col_rects = [cv2.boundingRect(contour) for contour in color_contours]
+
+        # Basic filtering for contours and rects
+        bin_contours, bin_rects = self.filter_contours_rects(bin_contours, bin_rects, rgb_img)
+        color_contours, col_rects = self.filter_contours_rects(color_contours, col_rects, rgb_img)
+
+        # Apply NMS to contours from binary image and color difference image
+        # COLOR contours are generally less reliable
+        final_contours = []
+        for col_rect, col_contour in zip(col_rects, color_contours):
+            append_flag = True
+            for bin_rect in bin_rects:
+                # Compute rectangle overlap
+                x_overlap = max(0, min(bin_rect[0] + bin_rect[2], col_rect[0] + col_rect[2]) - max(bin_rect[0], col_rect[0]))
+                y_overlap = max(0, min(bin_rect[1] + bin_rect[3], col_rect[1] + col_rect[3]) - max(bin_rect[1], col_rect[1]))
+                overlap = x_overlap * y_overlap
+                min_area = min(bin_rect[2] * bin_rect[3], col_rect[2] * col_rect[3])
+                normalized_overlap = overlap / min_area
+                NMS_THRES = 0.5
+                if normalized_overlap > NMS_THRES:
+                    # If overlap is too large, discard color contour
+                    append_flag = False
+                    break
+            if append_flag:
+                final_contours.append(col_contour)
+        final_contours.extend(bin_contours)
+
+        light_list = []
+        for contour in final_contours:
             light = cv2.minAreaRect(contour)
             light = light_class(light)
+
             if not self.is_light(light):
                 continue
 
-            bounding_rect = cv2.boundingRect(contour)
-
-            x, y, w, h = bounding_rect
-
-            if 0 <= x and 0 <= w and (x + w) <= rgb_img.shape[1] and 0 < y and 0 < h and y + h <=rgb_img.shape[0]:
-                sum_r = 0
-                sum_b = 0
-
-                roi = rgb_img[y:y+h,x:x+w]
-
-                for i in range(roi.shape[0]):
-                    for j in range(roi.shape[1]):
-                        if cv2.pointPolygonTest(contour, (j + x, i + y), False):
-                            # point is inside contour
-                            sum_r += roi[i,j,0]
-                            sum_b += roi[i,j,2]
-
-                if sum_r > sum_b:
-                    my_color = 0 # RED
-                else:
-                    my_color = 1 # BLUE
-                light.color = my_color
-                light_list.append(light)
+            light.color = self.detect_color
+            light_list.append(light)
         return light_list
     
     def is_light(self, light):
@@ -243,8 +338,8 @@ class cv_armor_proposer:
                 light1 = light_list[i]
                 light2 = light_list[j]
 
-                if light1.color != self.detect_color or light2.color != self.detect_color:
-                    continue
+                assert light1.color == self.detect_color
+                assert light2.color == self.detect_color
 
                 if self.contain_light(light1, light2, light_list):
                     continue
@@ -306,7 +401,8 @@ class dl_digit_classifier:
     LABEL_NAMES_LIST = np.array(['B', '1', '2', '3', '4', '5', 'G', 'O', 'N'])
     CLASSIFIER_THRESHOLD = 0.7
 
-    def __init__(self, model_path):
+    def __init__(self, config, model_path):
+        self.CFG = config
         self.net = cv2.dnn.readNetFromONNX(model_path)
     
     @staticmethod

@@ -8,8 +8,6 @@ import config
 
 DEFAULT_ENEMY_TEAM = 'red'
 
-DEBUG_DISPLAY = False
-
 class serial_circular_buffer:
     def __init__(self, buffer_size=10):
         self.buffer = []
@@ -42,35 +40,82 @@ class serial_circular_buffer:
         
         return self.default_color
 
-if __name__ == "__main__":
-    model = cv_mix_dl_detector(DEFAULT_ENEMY_TEAM)
+def main():
+    model = cv_mix_dl_detector(config, DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
-    aimer = Aim()
+    aimer = Aim(config)
     communicator = serial_port
     pkt_seq = 0
 
-    rgbd_camera = config.RGBD_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
+    autoaim_camera = config.AUTOAIM_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
 
     # color buffer which retrieves enemy color from STM32
     my_color_buffer = serial_circular_buffer()
 
+    if communicator is None:
+        print("SERIAL DEVICE IS NOT AVAILABLE!!!")
+
     while True:
         start = time.time()
-        frame, depth = rgbd_camera.get_frame()
+        frame = autoaim_camera.get_frame()
 
-        if (communicator.inWaiting() > 0):
-            # read the bytes and convert from binary array to ASCII
-            byte_array = communicator.read(communicator.inWaiting())
-            my_color_buffer.receive(byte_array)
+        if communicator is not None:
+            if (communicator.inWaiting() > 0):
+                # read the bytes and convert from binary array to ASCII
+                byte_array = communicator.read(communicator.inWaiting())
+                my_color_buffer.receive(byte_array)
         
+        # TODO: add a global reset function if enemy functions change
+        # (e.g., clear the buffer in the armor tracker)
         enemy_team = my_color_buffer.get_enemy_color()
         model.change_color(enemy_team)
 
         pred = model.detect(frame)
-        elapsed = time.time()-start
-        
-        ret_dict = aimer.process_one(pred, enemy_team, depth)
 
+        for i in range(len(pred)):
+            name, conf, bbox = pred[i]
+            # name from C++ string is in bytes; decoding is needed
+            if isinstance(name, bytes):
+                name_str = name.decode('utf-8')
+            else:
+                name_str = name
+            pred[i] = (name_str, conf, bbox)
+
+        elapsed = time.time()-start
+
+        if config.DEBUG_DISPLAY:
+            viz_frame = frame.copy()
+            for _, _, bbox in pred:
+                lower_x = int(bbox[0] - bbox[2] / 2)
+                lower_y = int(bbox[1] - bbox[3] / 2)
+                upper_x = int(bbox[0] + bbox[2] / 2)
+                upper_y = int(bbox[1] + bbox[3] / 2)
+                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+            cv2.imshow('all_detected', viz_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                exit(0)
+        
+        # Tracking and filtering
+        # Pour all predictions into the aimer, which returns relative angles
+        ret_dict = aimer.process_one(pred, enemy_team, frame)
+
+        if config.DEBUG_DISPLAY:
+            viz_frame = frame.copy()
+            for i in range(len(ret_dict['final_bbox_list'])):
+                bbox = ret_dict['final_bbox_list'][i]
+                unique_id = ret_dict['final_id_list'][i]
+                lower_x = int(bbox[0] - bbox[2] / 2)
+                lower_y = int(bbox[1] - bbox[3] / 2)
+                upper_x = int(bbox[0] + bbox[2] / 2)
+                upper_y = int(bbox[1] + bbox[3] / 2)
+                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+                viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.imshow('filtered_detected', viz_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                exit(0)
+
+        # TODO: put this into debug display
         show_frame = frame.copy()
 
         if ret_dict:
@@ -83,16 +128,17 @@ if __name__ == "__main__":
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
         
-        if DEBUG_DISPLAY:
+        if config.DEBUG_DISPLAY:
             print('----------------\n',pred)
             print('fps:',1./elapsed)
-            cv2.imshow('pred', show_frame)
+            cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
 
         if communicator is not None:
             communicator.write(packet)
-        else:
-            print("PACKET CREATED BUT SERIAL DEVICE IS NOT AVAILABLE!!!")
 
         pkt_seq += 1
+
+if __name__ == "__main__":
+    main()
