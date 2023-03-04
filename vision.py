@@ -1,73 +1,33 @@
 import time
 import cv2
 from Aiming.Aim import Aim
-from Communication.communicator import serial_port, create_packet
 # from Detection.YOLO import Yolo
 from Detection.CV_mix_DL import cv_mix_dl_detector
+from Communication.communicator import UARTCommunicator
 import config
 
-DEFAULT_ENEMY_TEAM = 'red'
-
-class serial_circular_buffer:
-    def __init__(self, buffer_size=10):
-        self.buffer = []
-        self.buffer_size = buffer_size
-        self.default_color = DEFAULT_ENEMY_TEAM
-    
-    def receive(self, byte_array):
-        for c in byte_array:
-            if len(self.buffer) >= self.buffer_size:
-                self.buffer = self.buffer[1:] # pop first element
-            self.buffer.append(c)
-
-    def get_enemy_color(self):
-        # TODO: if a robot is revived, the serial port might get
-        # garbage value in between...
-        blue_cnt = 0
-        red_cnt = 0
-
-        for l in self.buffer:
-            if l == ord('R'): red_cnt += 1
-            if l == ord('B'): blue_cnt += 1
-        
-        if blue_cnt > red_cnt:
-            self.default_color = 'blue'
-            return 'blue'
-        
-        if red_cnt > blue_cnt:
-            self.default_color = 'red'
-            return 'red'
-        
-        return self.default_color
-
 def main():
-    model = cv_mix_dl_detector(config, DEFAULT_ENEMY_TEAM)
+    model = cv_mix_dl_detector(config, config.DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim(config)
-    communicator = serial_port
-    pkt_seq = 0
+
+    communicator = UARTCommunicator(config)
 
     autoaim_camera = config.AUTOAIM_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
 
-    # color buffer which retrieves enemy color from STM32
-    my_color_buffer = serial_circular_buffer()
-
-    if communicator is None:
+    if communicator.is_valid():
+        print("OPENED SERIAL DEVICE AT: " + communicator.serial_port.name)
+    else:
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
 
     while True:
         start = time.time()
         frame = autoaim_camera.get_frame()
-
-        if communicator is not None:
-            if (communicator.inWaiting() > 0):
-                # read the bytes and convert from binary array to ASCII
-                byte_array = communicator.read(communicator.inWaiting())
-                my_color_buffer.receive(byte_array)
         
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
-        enemy_team = my_color_buffer.get_enemy_color()
+        stm32_state_dict = communicator.get_current_stm32_state()
+        enemy_team = stm32_state_dict['enemy_color']
         model.change_color(enemy_team)
 
         pred = model.detect(frame)
@@ -119,14 +79,14 @@ def main():
         show_frame = frame.copy()
 
         if ret_dict:
-            packet = create_packet(config.MOVE_YOKE, pkt_seq, ret_dict['yaw_diff'], ret_dict['pitch_diff'])
+            communicator.process_one_packet(config.MOVE_YOKE, ret_dict['yaw_diff'], ret_dict['pitch_diff'])
             show_frame = cv2.circle(show_frame,
                                     (int(ret_dict['center_x']), int(ret_dict['center_y'])),
                                     10, (0, 255, 0), 10)
         else:
             show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            packet = create_packet(config.SEARCH_TARGET, pkt_seq, 0, 0)
+            communicator.process_one_packet(config.SEARCH_TARGET, 0, 0)
         
         if config.DEBUG_DISPLAY:
             print('----------------\n',pred)
@@ -134,11 +94,6 @@ def main():
             cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
-
-        if communicator is not None:
-            communicator.write(packet)
-
-        pkt_seq += 1
 
 if __name__ == "__main__":
     main()
