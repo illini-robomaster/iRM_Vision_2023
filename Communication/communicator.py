@@ -1,6 +1,7 @@
 import os
 import serial
 import crc
+import time
 import threading
 
 class UARTCommunicator(object):
@@ -98,7 +99,7 @@ class UARTCommunicator(object):
         assert isinstance(self.seq_num, int) and self.seq_num >= 0
         if self.seq_num >= 2 ** 32:
             self.seq_num = self.seq_num % (2 ** 32)
-        packet += self.seq_num.to_bytes(4, self.endianness)
+        packet += (self.seq_num & 0xFFFFFFFF).to_bytes(4, self.endianness)
 
         discrete_yaw_offset = int(yaw_offset * 1e+6)
         discrete_pitch_offset = int(pitch_offset * 1e+6)
@@ -115,6 +116,8 @@ class UARTCommunicator(object):
 
         # ENDING
         packet += self.cfg.PACK_END
+
+        self.seq_num += 1
 
         return packet
 
@@ -145,3 +148,14 @@ class UARTCommunicator(object):
         }
 
         return ret_dict
+
+if __name__ == '__main__':
+    import sys
+    import os
+    # setting path
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+    import config
+    uart = UARTCommunicator(config)
+    for i in range(1000):
+        time.sleep(0.005) # simulate 200Hz
+        uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
