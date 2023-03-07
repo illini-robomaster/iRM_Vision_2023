@@ -19,7 +19,6 @@ Please follow instruction from the RMCV101 repo [here](https://github.com/illini
 - Implement a more robust tracker (e.g., EKF / Kalman)
 - Implement depth estimators (either use D455 or estimate from monocular cameras)
 - Optimize code efficiency on Jetson
-- Implement communication protocol and test with embedded team
 - Implememt MDVS camera driver in Python
 
 ## File Structure
