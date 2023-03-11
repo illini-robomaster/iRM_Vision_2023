@@ -5,7 +5,8 @@ import random
 from config import DARKNET_LIB_PATH
 
 # Note: darknet is patched per issue https://github.com/pjreddie/darknet/issues/289
-#============= copied from pjreddie's darknet repo
+# ============= copied from pjreddie's darknet repo
+
 
 def sample(probs):
     s = sum(probs)
@@ -16,6 +17,7 @@ def sample(probs):
         if r <= 0:
             return i
     return len(probs)-1
+
 
 def c_array(ctype, values):
     arr = (ctype*len(values))()
@@ -31,6 +33,8 @@ class BOX(Structure):
 
 # Follow up-to-date definition here
 # https://github.com/AlexeyAB/darknet/blob/ccb392ddf2ab49f66989e6318a2e379c9238068c/darknet.py#L56
+
+
 class DETECTION(Structure):
     _fields_ = [("bbox", BOX),
                 ("classes", c_int),
@@ -52,9 +56,11 @@ class IMAGE(Structure):
                 ("c", c_int),
                 ("data", POINTER(c_float))]
 
+
 class METADATA(Structure):
     _fields_ = [("classes", c_int),
                 ("names", POINTER(c_char_p))]
+
 
 lib = CDLL(DARKNET_LIB_PATH, RTLD_GLOBAL)
 lib.network_width.argtypes = [c_void_p]
@@ -74,7 +80,8 @@ make_image.argtypes = [c_int, c_int, c_int]
 make_image.restype = IMAGE
 
 get_network_boxes = lib.get_network_boxes
-get_network_boxes.argtypes = [c_void_p, c_int, c_int, c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
+get_network_boxes.argtypes = [c_void_p, c_int, c_int,
+                              c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
 get_network_boxes.restype = POINTER(DETECTION)
 
 make_network_boxes = lib.make_network_boxes
@@ -129,13 +136,15 @@ ndarray_image = lib.ndarray_to_image
 ndarray_image.argtypes = [POINTER(c_ubyte), POINTER(c_long), POINTER(c_long)]
 ndarray_image.restype = IMAGE
 
+
 def nparray_to_image(img):
     data = img.ctypes.data_as(POINTER(c_ubyte))
     image = ndarray_image(data, img.ctypes.shape, img.ctypes.strides)
 
     return image
 
-#============= copied from pjreddie's darknet repo
+# ============= copied from pjreddie's darknet repo
+
 
 class Yolo:
     def __init__(self, cfg_path, weight_path, meta_path, thresh=.5, hier_thresh=.5, nms=.45):
@@ -169,7 +178,8 @@ class Yolo:
         num = c_int(0)
         pnum = pointer(num)
         predict_image(self.net, im)
-        dets = get_network_boxes(self.net, im.w, im.h, self.thresh, self.hier_thresh, None, 0, pnum)
+        dets = get_network_boxes(self.net, im.w, im.h,
+                                 self.thresh, self.hier_thresh, None, 0, pnum)
         num = pnum[0]
         do_nms_obj(dets, num, self.meta.classes, self.nms)
 
@@ -178,9 +188,9 @@ class Yolo:
             for i in range(self.meta.classes):
                 if dets[j].prob[i] > 0:
                     b = dets[j].bbox
-                    res.append((self.meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
+                    res.append(
+                        (self.meta.names[i], dets[j].prob[i], (b.x, b.y, b.w, b.h)))
         res = sorted(res, key=lambda x: -x[1])
         free_image(im)
         free_detections(dets, num)
         return res
-        

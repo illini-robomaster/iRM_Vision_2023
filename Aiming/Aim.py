@@ -4,6 +4,7 @@ import Utils
 
 from .Tracking import basic_tracker
 
+
 class Aim:
     def __init__(self, config):
         self.CFG = config
@@ -14,10 +15,12 @@ class Aim:
 
         # TODO: use assertion to check enemy_team
 
-        final_bbox_list, final_id_list = self.tracker.process_one(pred_list, enemy_team, rgb_img)
+        final_bbox_list, final_id_list = self.tracker.process_one(
+            pred_list, enemy_team, rgb_img)
 
         # TODO: integrate this into tracking for consistent tracking
-        closet_pred, closet_dist = self.get_closet_pred(final_bbox_list, rgb_img)
+        closet_pred, closet_dist = self.get_closet_pred(
+            final_bbox_list, rgb_img)
 
         if closet_pred is None:
             return None
@@ -26,7 +29,8 @@ class Aim:
         # Get yaw/pitch differences in radians
         yaw_diff, pitch_diff = self.get_rotation_angle(center_x, center_y)
 
-        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(yaw_diff, pitch_diff, closet_dist)
+        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(
+            yaw_diff, pitch_diff, closet_dist)
 
         return {
             'yaw_diff': calibrated_yaw_diff,
@@ -36,7 +40,7 @@ class Aim:
             'final_bbox_list': final_bbox_list,
             'final_id_list': final_id_list,
         }
-    
+
     def posterior_calibration(self, yaw_diff, pitch_diff, distance):
         """Given a set of naively estimated parameters, return calibrated parameters
         from a range table?
@@ -56,7 +60,7 @@ class Aim:
             # In this case, distance comes from D455 stereo estimation
             # TODO: compute a range table
             return (yaw_diff, pitch_diff)
-    
+
     def get_closet_pred(self, bbox_list, rgb_img):
         '''Get the closet prediction to camera focal point'''
         # TODO: instead of camera focal point; calibrate closet pred to operator view
@@ -64,7 +68,7 @@ class Aim:
         focal_y = H / 2
         focal_x = W / 2
         closet_pred = None
-        closet_dist = None # Cloest to camera in z-axis
+        closet_dist = None  # Cloest to camera in z-axis
         closet_dist = 99999999
         for bbox in bbox_list:
             center_x, center_y, width, height = bbox
@@ -80,7 +84,9 @@ class Aim:
 
     @staticmethod
     def get_rotation_angle(bbox_center_x, bbox_center_y):
-        yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.AUTOAIM_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
-        pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * (config.AUTOAIM_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
+        yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * \
+            (config.AUTOAIM_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
+        pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * \
+            (config.AUTOAIM_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
 
         return yaw_diff, pitch_diff

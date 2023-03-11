@@ -1,5 +1,6 @@
 import threading
 
+
 class ConsistentIdGenerator(object):
     def __init__(self, lock=False):
         self.lock_flag = lock

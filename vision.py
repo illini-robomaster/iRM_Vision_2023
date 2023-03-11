@@ -6,6 +6,7 @@ from Detection.CV_mix_DL import cv_mix_dl_detector
 from Communication.communicator import UARTCommunicator
 import config
 
+
 def main():
     model = cv_mix_dl_detector(config, config.DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
@@ -23,7 +24,7 @@ def main():
     while True:
         start = time.time()
         frame = autoaim_camera.get_frame()
-        
+
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
         stm32_state_dict = communicator.get_current_stm32_state()
@@ -50,11 +51,12 @@ def main():
                 lower_y = int(bbox[1] - bbox[3] / 2)
                 upper_x = int(bbox[0] + bbox[2] / 2)
                 upper_y = int(bbox[1] + bbox[3] / 2)
-                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+                viz_frame = cv2.rectangle(
+                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
             cv2.imshow('all_detected', viz_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
-        
+
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
         ret_dict = aimer.process_one(pred, enemy_team, frame)
@@ -68,7 +70,8 @@ def main():
                 lower_y = int(bbox[1] - bbox[3] / 2)
                 upper_x = int(bbox[0] + bbox[2] / 2)
                 upper_y = int(bbox[1] + bbox[3] / 2)
-                viz_frame = cv2.rectangle(viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+                viz_frame = cv2.rectangle(
+                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
                 viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
                                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.imshow('filtered_detected', viz_frame)
@@ -79,21 +82,24 @@ def main():
         show_frame = frame.copy()
 
         if ret_dict:
-            communicator.process_one_packet(config.MOVE_YOKE, ret_dict['yaw_diff'], ret_dict['pitch_diff'])
+            communicator.process_one_packet(
+                config.MOVE_YOKE, ret_dict['yaw_diff'], ret_dict['pitch_diff'])
             show_frame = cv2.circle(show_frame,
-                                    (int(ret_dict['center_x']), int(ret_dict['center_y'])),
+                                    (int(ret_dict['center_x']),
+                                     int(ret_dict['center_y'])),
                                     10, (0, 255, 0), 10)
         else:
             show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             communicator.process_one_packet(config.SEARCH_TARGET, 0, 0)
-        
+
         if config.DEBUG_DISPLAY:
-            print('----------------\n',pred)
-            print('fps:',1./elapsed)
+            print('----------------\n', pred)
+            print('fps:', 1./elapsed)
             cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
+
 
 if __name__ == "__main__":
     main()
