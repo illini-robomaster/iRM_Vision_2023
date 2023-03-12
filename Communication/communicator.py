@@ -6,7 +6,12 @@ import threading
 
 
 class UARTCommunicator(object):
-    def __init__(self, cfg, crc_standard=crc.Crc8.MAXIM_DOW, endianness='little', buffer_size=10):
+    def __init__(
+            self,
+            cfg,
+            crc_standard=crc.Crc8.MAXIM_DOW,
+            endianness='little',
+            buffer_size=10):
         self.cfg = cfg
         self.crc_standard = crc_standard
         self.endianness = endianness
@@ -135,10 +140,10 @@ class UARTCommunicator(object):
         blue_cnt = 0
         red_cnt = 0
 
-        for l in self.circular_buffer:
-            if l == ord('R'):
+        for read_byte in self.circular_buffer:
+            if read_byte == ord('R'):
                 red_cnt += 1
-            if l == ord('B'):
+            if read_byte == ord('B'):
                 blue_cnt += 1
 
         if blue_cnt > red_cnt:

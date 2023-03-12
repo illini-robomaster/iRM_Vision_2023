@@ -42,7 +42,7 @@ def main():
                 name_str = name
             pred[i] = (name_str, conf, bbox)
 
-        elapsed = time.time()-start
+        elapsed = time.time() - start
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
@@ -95,7 +95,7 @@ def main():
 
         if config.DEBUG_DISPLAY:
             print('----------------\n', pred)
-            print('fps:', 1./elapsed)
+            print('fps:', 1. / elapsed)
             cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)

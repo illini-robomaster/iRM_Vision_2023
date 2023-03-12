@@ -36,7 +36,7 @@ def auto_align_brightness(img, target_v=50):
 
 
 def color_test(rgb_img, rect, color):
-    rgb_roi = rgb_img[rect[1]:rect[1]+rect[3], rect[0]:rect[0]+rect[2]]
+    rgb_roi = rgb_img[rect[1]:rect[1] + rect[3], rect[0]:rect[0] + rect[2]]
     sum_r = np.sum(rgb_roi[:, :, 0])
     sum_b = np.sum(rgb_roi[:, :, 2])
     if color == RED:
@@ -105,7 +105,8 @@ class cv_mix_dl_detector:
 
 
 def rect_contains(rect, pt):
-    return rect[0] < pt[0] < rect[0]+rect[2] and rect[1] < pt[1] < rect[1]+rect[3]
+    return rect[0] < pt[0] < rect[0] + \
+        rect[2] and rect[1] < pt[1] < rect[1] + rect[3]
 
 
 class light_class:
@@ -120,7 +121,12 @@ class light_class:
         self.width = cv2.norm(pts[0] - pts[1])
 
         self.tilt_angle = np.arctan2(
-            np.abs(self.top[0] - self.btm[0]), np.abs(self.top[1] - self.btm[1]))
+            np.abs(
+                self.top[0] -
+                self.btm[0]),
+            np.abs(
+                self.top[1] -
+                self.btm[1]))
         self.tilt_angle = self.tilt_angle / np.pi * 180
 
         self.center = np.array([self.center_x, self.center_y])
@@ -179,12 +185,12 @@ class armor_class:
 
         start_x = int((warp_width - roi_size[0]) / 2)
         self.number_image = self.number_image[:roi_size[1],
-                                              start_x:start_x+roi_size[0]]
+                                              start_x:start_x + roi_size[0]]
 
         # Binarize
         self.number_image = cv2.cvtColor(self.number_image, cv2.COLOR_RGB2GRAY)
         thres, self.number_image = cv2.threshold(
-            self.number_image, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            self.number_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
 
 class cv_armor_proposer(object):
@@ -224,8 +230,12 @@ class cv_armor_proposer(object):
             viz_img = rgb_img.copy()
             # visualize lights
             for light in light_list:
-                cv2.rectangle(viz_img, (int(light.top[0]), int(light.top[1])), (int(
-                    light.btm[0]), int(light.btm[1])), (0, 255, 0), 2)
+                cv2.rectangle(
+                    viz_img, (int(
+                        light.top[0]), int(
+                        light.top[1])), (int(
+                            light.btm[0]), int(
+                            light.btm[1])), (0, 255, 0), 2)
             cv2.imshow('lights', viz_img)
             cv2.waitKey(1)
 
@@ -234,8 +244,12 @@ class cv_armor_proposer(object):
             viz_img = rgb_img.copy()
             # visualize armors
             for armor in armor_list:
-                cv2.rectangle(viz_img, (int(armor.left_light.top[0]), int(armor.left_light.top[1])), (int(
-                    armor.right_light.btm[0]), int(armor.right_light.btm[1])), (0, 255, 0), 2)
+                cv2.rectangle(
+                    viz_img, (int(
+                        armor.left_light.top[0]), int(
+                        armor.left_light.top[1])), (int(
+                            armor.right_light.btm[0]), int(
+                            armor.right_light.btm[1])), (0, 255, 0), 2)
             cv2.imshow('armors', viz_img)
             cv2.waitKey(1)
 
@@ -321,10 +335,14 @@ class cv_armor_proposer(object):
             append_flag = True
             for bin_rect in bin_rects:
                 # Compute rectangle overlap
-                x_overlap = max(0, min(
-                    bin_rect[0] + bin_rect[2], col_rect[0] + col_rect[2]) - max(bin_rect[0], col_rect[0]))
-                y_overlap = max(0, min(
-                    bin_rect[1] + bin_rect[3], col_rect[1] + col_rect[3]) - max(bin_rect[1], col_rect[1]))
+                x_overlap = max(0,
+                                min(bin_rect[0] + bin_rect[2],
+                                    col_rect[0] + col_rect[2]) - max(bin_rect[0],
+                                                                     col_rect[0]))
+                y_overlap = max(0,
+                                min(bin_rect[1] + bin_rect[3],
+                                    col_rect[1] + col_rect[3]) - max(bin_rect[1],
+                                                                     col_rect[1]))
                 overlap = x_overlap * y_overlap
                 min_area = min(bin_rect[2] * bin_rect[3],
                                col_rect[2] * col_rect[3])
@@ -389,8 +407,10 @@ class cv_armor_proposer(object):
             if test_light == light1 or test_light == light2:
                 continue
 
-            if rect_contains(rect, test_light.top) or rect_contains(rect, test_light.btm)\
-                    or rect_contains(rect, test_light.center):
+            if rect_contains(
+                    rect, test_light.top) or rect_contains(
+                    rect, test_light.btm) or rect_contains(
+                    rect, test_light.center):
                 return True
 
         return False
@@ -409,10 +429,11 @@ class cv_armor_proposer(object):
         center_dist = cv2.norm(
             light1.center - light2.center) / avg_light_length
 
-        center_dist_ok = ((self.ARMOR_MIN_SMALL_CENTER_DISTANCE < center_dist)
-                          and (center_dist < self.ARMOR_MAX_SMALL_CENTER_DISTANCE)) or\
-            ((self.ARMOR_MIN_LARGE_CENTER_DISTANCE < center_dist)
-             and (center_dist < self.ARMOR_MAX_LARGE_CENTER_DISTANCE))
+        center_dist_ok = (
+            (self.ARMOR_MIN_SMALL_CENTER_DISTANCE < center_dist) and (
+                center_dist < self.ARMOR_MAX_SMALL_CENTER_DISTANCE)) or (
+            (self.ARMOR_MIN_LARGE_CENTER_DISTANCE < center_dist) and (
+                center_dist < self.ARMOR_MAX_LARGE_CENTER_DISTANCE))
 
         # test light center connection angle
         diff = light1.center - light2.center
@@ -456,7 +477,8 @@ class dl_digit_classifier:
             max_class = softmax_probs.argmax(axis=1)
             max_class_names = self.LABEL_NAMES_LIST[max_class]
 
-            if softmax_probs[0, max_class] < self.CLASSIFIER_THRESHOLD or max_class_names == 'N':
+            if softmax_probs[0,
+                             max_class] < self.CLASSIFIER_THRESHOLD or max_class_names == 'N':
                 continue
 
             # TODO: use digit predictions to improve accuracy?

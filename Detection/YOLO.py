@@ -10,17 +10,17 @@ from config import DARKNET_LIB_PATH
 
 def sample(probs):
     s = sum(probs)
-    probs = [a/s for a in probs]
+    probs = [a / s for a in probs]
     r = random.uniform(0, 1)
     for i in range(len(probs)):
         r = r - probs[i]
         if r <= 0:
             return i
-    return len(probs)-1
+    return len(probs) - 1
 
 
 def c_array(ctype, values):
-    arr = (ctype*len(values))()
+    arr = (ctype * len(values))()
     arr[:] = values
     return arr
 
@@ -80,8 +80,15 @@ make_image.argtypes = [c_int, c_int, c_int]
 make_image.restype = IMAGE
 
 get_network_boxes = lib.get_network_boxes
-get_network_boxes.argtypes = [c_void_p, c_int, c_int,
-                              c_float, c_float, POINTER(c_int), c_int, POINTER(c_int)]
+get_network_boxes.argtypes = [
+    c_void_p,
+    c_int,
+    c_int,
+    c_float,
+    c_float,
+    POINTER(c_int),
+    c_int,
+    POINTER(c_int)]
 get_network_boxes.restype = POINTER(DETECTION)
 
 make_network_boxes = lib.make_network_boxes
@@ -147,12 +154,19 @@ def nparray_to_image(img):
 
 
 class Yolo:
-    def __init__(self, cfg_path, weight_path, meta_path, thresh=.5, hier_thresh=.5, nms=.45):
+    def __init__(
+            self,
+            cfg_path,
+            weight_path,
+            meta_path,
+            thresh=.5,
+            hier_thresh=.5,
+            nms=.45):
         '''
         Args:
             cfg_path: path to darknet model definition files
             weight_path: path to darkent model weight
-            meta_path: path to detection meta path 
+            meta_path: path to detection meta path
                 (note: see https://github.com/pjreddie/darknet/blob/master/python/darknet.py for
                 example meta definition)
             thresh: confidence threshold for unet
@@ -173,7 +187,7 @@ class Yolo:
         Return:
             An array of tuple (class name, prob, (x, y, w, h))
         '''
-        #im = load_image(image, 0, 0)
+        # im = load_image(image, 0, 0)
         im = nparray_to_image(image)
         num = c_int(0)
         pnum = pointer(num)

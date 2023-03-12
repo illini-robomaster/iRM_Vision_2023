@@ -30,12 +30,14 @@ class tracked_armor(object):
         self.roi_buffer.append(other_armor.roi_buffer[-1])
         self.observed_frame_tick.append(frame_tick)
 
-        # Maintain each armor's buffer so that anything older than FRAME_BUFFER_SIZE is dropped
+        # Maintain each armor's buffer so that anything older than
+        # FRAME_BUFFER_SIZE is dropped
         self.bbox_buffer = self.bbox_buffer[-FRAME_BUFFER_SIZE:]
         self.roi_buffer = self.roi_buffer[-FRAME_BUFFER_SIZE:]
 
     def predict_bbox(self, cur_frame_tick):
-        if cur_frame_tick == self.observed_frame_tick[-1] or len(self.bbox_buffer) == 1:
+        if cur_frame_tick == self.observed_frame_tick[-1] or len(
+                self.bbox_buffer) == 1:
             return self.bbox_buffer[-1]
         else:
             # Linear extrapolation
@@ -97,7 +99,8 @@ class basic_tracker(object):
         for n in new_armors:
             n.armor_id = self.id_gen.get_id()
 
-        # Maintain current buffer. If an armor has not been observed by 10 frames, it is dropped
+        # Maintain current buffer. If an armor has not been observed by 10
+        # frames, it is dropped
         self.active_armors = [i for i in self.active_armors
                               if self.frame_tick - i.observed_frame_tick[-1] < FRAME_BUFFER_SIZE]
 
