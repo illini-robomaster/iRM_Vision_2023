@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pycodestyle
         pip install pydocstyle
-    - name: Analysing the code with pylint
+    - name: Analysing the code with pycodestyle and pydocstyle
       run: |
         pycodestyle --max-line-length=100 ./
         pydocstyle ./
