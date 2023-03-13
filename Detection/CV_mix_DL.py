@@ -8,62 +8,6 @@ import Utils
 RED = 0
 BLUE = 1
 
-
-def auto_align_brightness(img, target_v=50):
-    """Standardize brightness of image.
-
-    Args:
-        img (np.ndarray): BGR image
-        target_v (int, optional): target brightness. Defaults to 50.
-
-    Returns:
-        np.ndarray: BGR image with standardized brightness
-    """
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-
-    cur_v = np.mean(v)
-    v_diff = int(cur_v - target_v)
-
-    if v_diff > 0:
-        value = v_diff
-        # needs lower brightness
-        v[v < value] = 0
-        v[v >= value] -= value
-        final_hsv = cv2.merge((h, s, v))
-        img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-        return img
-    else:
-        # brighten
-        value = -v_diff
-        # needs lower brightness
-        v[v > (255 - value)] = 255
-        v[v <= (255 - value)] += value
-        final_hsv = cv2.merge((h, s, v))
-        img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-        return img
-
-
-def color_test(rgb_img, rect, color):
-    """Test if the color of the roi is the same as the given color.
-
-    Args:
-        rgb_img (np.ndarray): RGB image
-        rect (tuple): (x, y, w, h)
-        color (int): RED or BLUE (enum)
-
-    Returns:
-        bool: True if the color of the roi is the same as the given color
-    """
-    rgb_roi = rgb_img[rect[1]:rect[1] + rect[3], rect[0]:rect[0] + rect[2]]
-    sum_r = np.sum(rgb_roi[:, :, 0])
-    sum_b = np.sum(rgb_roi[:, :, 2])
-    if color == RED:
-        return sum_r >= sum_b
-    else:
-        return sum_b >= sum_r
-
-
 class cv_mix_dl_detector:
     """A routine that combines CV and DL to detect armors.
 
@@ -103,7 +47,7 @@ class cv_mix_dl_detector:
         Returns:
             list: list of detected armors
         """
-        rgb_img = auto_align_brightness(rgb_img)
+        rgb_img = Utils.auto_align_brightness(rgb_img)
         # defaults to BGR format
         rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
         # propose potential armors
@@ -153,21 +97,6 @@ class cv_mix_dl_detector:
             self.armor_proposer.detect_color = color_num
         else:
             raise NotImplementedError
-
-
-def rect_contains(rect, pt):
-    """Determine if a pt is inside a rect.
-
-    Args:
-        rect (tuple): (x, y, w, h)
-        pt (tuple): (x, y)
-
-    Returns:
-        bool: True if the pt is inside the rect
-    """
-    return rect[0] < pt[0] < rect[0] + \
-        rect[2] and rect[1] < pt[1] < rect[1] + rect[3]
-
 
 class light_class:
     """
@@ -303,7 +232,6 @@ class armor_class:
         thres, self.number_image = cv2.threshold(
             self.number_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-
 class cv_armor_proposer:
     """Armor proposer using OpenCV."""
 
@@ -420,7 +348,7 @@ class cv_armor_proposer:
                 continue
 
             # Color test
-            if not color_test(rgb_img, rects[i], self.detect_color):
+            if not Utils.color_test(rgb_img, rects[i], self.detect_color):
                 continue
 
             filtered_rects.append(rects[i])
@@ -609,9 +537,9 @@ class cv_armor_proposer:
             if test_light == light1 or test_light == light2:
                 continue
 
-            if rect_contains(
-                    rect, test_light.top) or rect_contains(
-                    rect, test_light.btm) or rect_contains(
+            if Utils.rect_contains(
+                    rect, test_light.top) or Utils.rect_contains(
+                    rect, test_light.btm) or Utils.rect_contains(
                     rect, test_light.center):
                 return True
 
@@ -661,7 +589,6 @@ class cv_armor_proposer:
             armor.armor_type = 'small'
 
         return light_ratio_ok and center_dist_ok and angle_ok
-
 
 class dl_digit_classifier:
     """Classify digits in armor number using deep learning model."""
