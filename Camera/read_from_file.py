@@ -7,6 +7,7 @@ import Utils
 
 # TODO: make an abstract camera base class
 
+
 class fake_camera:
     """
     Fake camera class that mimics the behavior of the real camera.

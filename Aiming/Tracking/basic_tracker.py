@@ -8,6 +8,8 @@ from .consistent_id_gen import ConsistentIdGenerator
 FRAME_BUFFER_SIZE = 10
 
 # TODO: this class should be part of abstract base tracker class
+
+
 class tracked_armor(object):
     """A class that represents a tracked armor.
 
@@ -17,7 +19,7 @@ class tracked_armor(object):
 
     def __init__(self, bbox, roi, frame_tick, armor_id):
         """Initialize from prediction.
-        
+
         Args:
             bbox (tuple): (center_x, center_y, w, h)
             roi (np.ndarray): ROI of the armor
@@ -31,10 +33,10 @@ class tracked_armor(object):
 
     def compute_cost(self, other_armor):
         """Compute the cost of matching this armor with another armor.
-        
+
         Args:
             other_armor (tracked_armor): another armor
-        
+
         Returns:
             float: cost
         """
@@ -63,10 +65,10 @@ class tracked_armor(object):
 
     def predict_bbox(self, cur_frame_tick):
         """Predict the bounding box of the tracked armor at cur frame tick.
-        
+
         Args:
             cur_frame_tick (int): current frame tick
-        
+
         TODO
             - Use Kalman filter to do prediction
             - Support future frame idx for predictions
@@ -100,7 +102,7 @@ class basic_tracker(object):
 
     def __init__(self, config):
         """Initialize the simple lineartracker.
-        
+
         Args:
             config (python object): shared config
         """

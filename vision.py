@@ -1,3 +1,10 @@
+"""
+Main file for both development and deployment.
+
+For development purpose, you may want to turn on the DEBUG_DISPLAY flag
+in config.py
+"""
+
 import time
 import cv2
 from Aiming.Aim import Aim
@@ -8,6 +15,7 @@ import config
 
 
 def main():
+    """Define the main while-true control loop that manages everything."""
     model = cv_mix_dl_detector(config, config.DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim(config)

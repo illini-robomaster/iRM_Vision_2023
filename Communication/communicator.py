@@ -5,6 +5,7 @@ import crc
 import time
 import threading
 
+
 class UARTCommunicator:
     """USB-TTL-UART communicator for Jetson-STM32 communication."""
 
@@ -59,7 +60,7 @@ class UARTCommunicator:
 
     def process_one_packet(self, header, yaw_offset, pitch_offset):
         """Process a batch of numbers into a CRC-checked packet and send it out.
-        
+
         Args:
             header (str): either 'ST' or 'MV'
             yaw_offset (float): yaw offset in radians
@@ -76,7 +77,7 @@ class UARTCommunicator:
     @staticmethod
     def guess_uart_device_():
         """Guess the UART device path and open it.
-        
+
         Note: this function is for UNIX-like systems only!
 
         OSX prefix: "tty.usbmodem"
@@ -170,7 +171,7 @@ class UARTCommunicator:
 
     def get_current_stm32_state(self):
         """Read from buffer from STM32 to Jetson and return the current state.
-        
+
         TODO:
             - Decode packet sent from the STM32 controller
             - If a robot is revived, the serial port might get garbage value in between

@@ -2,6 +2,7 @@
 
 import threading
 
+
 class ConsistentIdGenerator:
     """Return a consistent id for each object."""
 

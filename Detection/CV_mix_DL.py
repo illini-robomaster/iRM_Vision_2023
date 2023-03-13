@@ -8,13 +8,14 @@ import Utils
 RED = 0
 BLUE = 1
 
+
 def auto_align_brightness(img, target_v=50):
     """Standardize brightness of image.
-    
+
     Args:
         img (np.ndarray): BGR image
         target_v (int, optional): target brightness. Defaults to 50.
-        
+
     Returns:
         np.ndarray: BGR image with standardized brightness
     """
@@ -42,14 +43,15 @@ def auto_align_brightness(img, target_v=50):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+
 def color_test(rgb_img, rect, color):
     """Test if the color of the roi is the same as the given color.
-    
+
     Args:
         rgb_img (np.ndarray): RGB image
         rect (tuple): (x, y, w, h)
         color (int): RED or BLUE (enum)
-        
+
     Returns:
         bool: True if the color of the roi is the same as the given color
     """
@@ -61,15 +63,16 @@ def color_test(rgb_img, rect, color):
     else:
         return sum_b >= sum_r
 
+
 class cv_mix_dl_detector:
     """A routine that combines CV and DL to detect armors.
-    
+
     It uses CV to propose potential armors, and then uses DL to filter out false positives.
     """
-    
+
     def __init__(self, config, detect_color, model_path='fc.onnx'):
         """Initialize the detector.
-        
+
         Args:
             config (python object): shared config.py
             detect_color (int): RED or BLUE (enum)
@@ -82,10 +85,10 @@ class cv_mix_dl_detector:
 
     def detect(self, rgb_img):
         """Detect armors in the given image.
-        
+
         Args:
             rgb_img (np.ndarray): RGB image
-            
+
         Returns:
             list: list of detected armors
         """
@@ -93,10 +96,10 @@ class cv_mix_dl_detector:
 
     def __call__(self, rgb_img):
         """Detect armors in the given image.
-        
+
         Args:
             rgb_img (np.ndarray): RGB image
-            
+
         Returns:
             list: list of detected armors
         """
@@ -128,7 +131,7 @@ class cv_mix_dl_detector:
 
     def change_color(self, new_color):
         """Change the color of the detector.
-        
+
         Args:
             new_color (int): RED or BLUE (enum)
         """
@@ -154,11 +157,11 @@ class cv_mix_dl_detector:
 
 def rect_contains(rect, pt):
     """Determine if a pt is inside a rect.
-    
+
     Args:
         rect (tuple): (x, y, w, h)
         pt (tuple): (x, y)
-        
+
     Returns:
         bool: True if the pt is inside the rect
     """
@@ -187,7 +190,7 @@ class light_class:
 
     def __init__(self, rotated_rect):
         """Initialize the light bar.
-        
+
         Args:
             rotated_rect (tuple): (center, (width, height), angle)
         """
@@ -229,7 +232,7 @@ class armor_class:
 
     def __init__(self, light1, light2, color):
         """Initialize the armor board.
-        
+
         Args:
             light1 (light_class): left light bar
             light2 (light_class): right light bar
@@ -256,7 +259,7 @@ class armor_class:
         The perspective transform matrix is computed by using top and bottom
         points of the left and right light bars as source vertices, and
         manually set target vertices.
-        
+
         Args:
             rgb_img (np.ndarray): RGB image
         """
@@ -326,7 +329,7 @@ class cv_armor_proposer:
 
     def __init__(self, config, detect_color):
         """Initialize the armor proposer.
-        
+
         Args:
             config (python object): shared config.py
             detect_color (int): color to detect (0: red, 1: blue ENUM)
@@ -336,10 +339,10 @@ class cv_armor_proposer:
 
     def __call__(self, rgb_img):
         """Run the armor proposer for a single image.
-        
+
         Args:
             rgb_img (np.ndarray): RGB image
-            
+
         Returns:
             list of armor_class: list of detected armors
         """
@@ -384,7 +387,7 @@ class cv_armor_proposer:
 
         Args:
             rgb_img (np.ndarray): RGB image
-        
+
         Returns:
             np.ndarray: binarized image
         """
@@ -402,7 +405,7 @@ class cv_armor_proposer:
             contours (list of np.ndarray): contours
             rects (list of np.ndarray): bounding rectangles
             rgb_img (np.ndarray): RGB image
-        
+
         Returns:
             list of np.ndarray: filtered contours
             list of np.ndarray: filtered bounding rectangles
@@ -448,11 +451,11 @@ class cv_armor_proposer:
             IoU = intersection / area of smaller one
 
         instead.
-        
+
         Args:
             rgb_img (np.ndarray): RGB image
             binary_img (np.ndarray): binarized image
-            
+
         Returns:
             list of light_class: list of detected lights
         """
@@ -541,10 +544,10 @@ class cv_armor_proposer:
         Criteria:
             1. Aspect ratio can not be too large or too small (light bars are slim verticals)
             2. Tilt angle (light bars are vertical)
-        
+
         Args:
             light (light_class): light bar to be filtered
-            
+
         Returns:
             bool: True if the light bar is valid
         """
@@ -557,10 +560,10 @@ class cv_armor_proposer:
 
     def match_lights(self, light_list):
         """Match pairs of lights into armors.
-        
+
         Args:
             light_list (list of light_class): list of detected lights
-            
+
         Returns:
             list of armor_class: list of detected armors
         """
@@ -588,12 +591,12 @@ class cv_armor_proposer:
         """Test if a pair of light is contained in another light bar.
 
         Empirically, this is a good way to filter out false positives.
-        
+
         Args:
             light1 (light_class): light bar 1
             light2 (light_class): light bar 2
             light_list (list of light_class): list of all detected lights
-        
+
         Returns:
             bool: True if light1 and light2 are contained in another light bar
         """
@@ -616,15 +619,15 @@ class cv_armor_proposer:
 
     def is_armor(self, armor):
         """Apply filtering to determine if an armor is valid.
-        
+
         Criteria:
             1. The length of two light bars can not be too different
             2. The ratio of distance between two light bars and their length
             3. The angle of armor boards two light bars would form
-        
+
         Args:
             armor (armor_class): armor to be filtered
-        
+
         Returns:
             bool: True if the armor meets all the criteria
         """
@@ -668,7 +671,7 @@ class dl_digit_classifier:
 
     def __init__(self, config, model_path):
         """Initialize the classifier.
-        
+
         Args:
             config (python object): shared config.py
             model_path (str): path to the model file
@@ -683,10 +686,10 @@ class dl_digit_classifier:
 
     def __call__(self, armor_list):
         """Classify a batch of armor numbers.
-        
+
         Args:
             armor_list (list of armor_class): list of armors to be classified
-        
+
         Returns:
             list of str: list of classified armor numbers
         """

@@ -5,7 +5,7 @@ from .Tracking import basic_tracker
 class Aim:
     """
     The main class for auto-aiming.
-    
+
     Its workflow:
         1. takes in a list of predictions from the detection module
         2. apply tracker to fill in missing predictions / append or associate predictions
@@ -88,7 +88,7 @@ class Aim:
 
     def get_closet_pred(self, bbox_list, rgb_img):
         """Get the closet prediction to camera focal point.
-        
+
         Args:
             bbox_list (list): a list of bounding boxes
             rgb_img (np.ndarray): RGB image
@@ -122,7 +122,7 @@ class Aim:
         Args:
             bbox_center_x (float): x coordinate of the center of the bounding box
             bbox_center_y (float): y coordinate of the center of the bounding box
-        
+
         Returns:
             (float, float): yaw_diff, pitch_diff in radians
         """
