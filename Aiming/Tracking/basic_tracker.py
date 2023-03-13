@@ -1,23 +1,43 @@
-import os
+"""Defines a basic linear tracker and base classes for future dev."""
 import scipy.optimize
 import numpy as np
 
 from .consistent_id_gen import ConsistentIdGenerator
 
-from IPython import embed
-
 # TODO: move this to config
 FRAME_BUFFER_SIZE = 10
 
-
+# TODO: this class should be part of abstract base tracker class
 class tracked_armor(object):
+    """A class that represents a tracked armor.
+
+    It stores the history of bounding boxes and ROIs, and can predict the
+    bounding box of the next frame.
+    """
+
     def __init__(self, bbox, roi, frame_tick, armor_id):
+        """Initialize from prediction.
+        
+        Args:
+            bbox (tuple): (center_x, center_y, w, h)
+            roi (np.ndarray): ROI of the armor
+            frame_tick (int): frame tick
+            armor_id (int): unique ID
+        """
         self.bbox_buffer = [bbox]
         self.roi_buffer = [roi]
         self.observed_frame_tick = [frame_tick]
         self.armor_id = armor_id  # unique ID
 
     def compute_cost(self, other_armor):
+        """Compute the cost of matching this armor with another armor.
+        
+        Args:
+            other_armor (tracked_armor): another armor
+        
+        Returns:
+            float: cost
+        """
         assert isinstance(other_armor, tracked_armor)
         # TODO: use more sophisticated metrics (e.g., RGB) as cost function
         c_x, c_y, w, h = self.bbox_buffer[-1]
@@ -25,6 +45,12 @@ class tracked_armor(object):
         return np.square(c_x - o_c_x) + np.square(c_y - o_c_y)
 
     def update(self, other_armor, frame_tick):
+        """Update the state of this armor with matched armor.
+
+        Args:
+            other_armor (tracked_armor): another armor
+            frame_tick (int): frame tick
+        """
         # Only call if these two armors are matched
         self.bbox_buffer.append(other_armor.bbox_buffer[-1])
         self.roi_buffer.append(other_armor.roi_buffer[-1])
@@ -36,6 +62,18 @@ class tracked_armor(object):
         self.roi_buffer = self.roi_buffer[-FRAME_BUFFER_SIZE:]
 
     def predict_bbox(self, cur_frame_tick):
+        """Predict the bounding box of the tracked armor at cur frame tick.
+        
+        Args:
+            cur_frame_tick (int): current frame tick
+        
+        TODO
+            - Use Kalman filter to do prediction
+            - Support future frame idx for predictions
+
+        Returns:
+            tuple: (center_x, center_y, w, h)
+        """
         if cur_frame_tick == self.observed_frame_tick[-1] or len(
                 self.bbox_buffer) == 1:
             return self.bbox_buffer[-1]
@@ -52,20 +90,36 @@ class tracked_armor(object):
 
 
 class basic_tracker(object):
-    '''
+    """
     Basic tracker that can handle only one target.
 
     It memorizes the state of last two predictions and do linear extrapolation
-    '''
+    """
+
     SE_THRESHOLD = 3200  # (40, 40) pixels away
 
     def __init__(self, config):
+        """Initialize the simple lineartracker.
+        
+        Args:
+            config (python object): shared config
+        """
         self.CFG = config
         self.active_armors = []
         self.id_gen = ConsistentIdGenerator()
         self.frame_tick = 0  # TODO: use timestamp may be a better idea
 
     def process_one(self, pred_list, enemy_team, rgb_img):
+        """Process one set of detections and rgb images.
+
+        Args:
+            pred_list (list): list of (name, conf, bbox) tuples
+            enemy_team (str): enemy team name (blue or red)
+            rgb_img (np.ndarray): RGB image
+
+        Returns:
+            (list, list): list of tracked_armors (detections+predictions) and their IDs
+        """
         new_armors = []
         for name, conf, bbox in pred_list:
             c_x, c_y, w, h = bbox
