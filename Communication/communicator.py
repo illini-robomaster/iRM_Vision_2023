@@ -1,17 +1,27 @@
+"""Host the UART communicator. See UARTCommunicator."""
 import os
 import serial
 import crc
 import time
 import threading
 
+class UARTCommunicator:
+    """USB-TTL-UART communicator for Jetson-STM32 communication."""
 
-class UARTCommunicator(object):
     def __init__(
             self,
             cfg,
             crc_standard=crc.Crc8.MAXIM_DOW,
             endianness='little',
             buffer_size=10):
+        """Initialize the UART communicator.
+
+        Args:
+            cfg (python object): shared config
+            crc_standard (crc.Crc8): CRC standard
+            endianness (str): endianness of the packet. Either 'big' or 'little'
+            buffer_size (int): size of the circular buffer
+        """
         self.cfg = cfg
         self.crc_standard = crc_standard
         self.endianness = endianness
@@ -29,9 +39,11 @@ class UARTCommunicator(object):
         self.seq_num = 0
 
     def is_valid(self):
+        """Return if communicator is valid."""
         return self.serial_port is not None
 
     def try_read_one(self):
+        """Try to read one packet from the serial port and store to internal buffer."""
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
             if (self.serial_port.inWaiting() > 0):
@@ -46,19 +58,34 @@ class UARTCommunicator(object):
                     self.circular_buffer.append(c)
 
     def process_one_packet(self, header, yaw_offset, pitch_offset):
+        """Process a batch of numbers into a CRC-checked packet and send it out.
+        
+        Args:
+            header (str): either 'ST' or 'MV'
+            yaw_offset (float): yaw offset in radians
+            pitch_offset (float): pitch offset in radians
+        """
         packet = self.create_packet(header, yaw_offset, pitch_offset)
         self.send_packet(packet)
 
     def send_packet(self, packet):
+        """Send a packet out."""
         if self.serial_port is not None:
             self.serial_port.write(packet)
 
     @staticmethod
     def guess_uart_device_():
-        # This function is for UNIX-like systems only!
+        """Guess the UART device path and open it.
+        
+        Note: this function is for UNIX-like systems only!
 
-        # OSX prefix: "tty.usbmodem"
-        # Jetson / Linux prefix: "ttyUSB", "ttyACM"
+        OSX prefix: "tty.usbmodem"
+        Jetson / Linux prefix: "ttyUSB", "ttyACM"
+
+        Returns:
+            serial.Serial: the serial port object
+        """
+        # list of possible prefixes
         UART_PREFIX_LIST = ("tty.usbmodem", "ttyUSB", "ttyACM")
 
         dev_list = os.listdir("/dev")
@@ -88,7 +115,17 @@ class UARTCommunicator(object):
 
     def create_packet(self, header, yaw_offset, pitch_offset):
         """
-        Packet struct
+        Create CRC-checked packet from user input.
+
+        Args:
+            header (str): either 'ST' or 'MV'
+            yaw_offset (float): yaw offset in radians
+            pitch_offset (float): pitch offset in radians
+
+        Returns:
+            bytes: the packet to be sent to serial
+
+        For more details, see doc/comms_protocol.md, but here is a summary of the packet format:
 
         Big endian
 
@@ -132,11 +169,16 @@ class UARTCommunicator(object):
         return packet
 
     def get_current_stm32_state(self):
-        # Decode packet sent from the STM32 controller
-        # TODO: if a robot is revived, the serial port might get
-        # garbage value in between...
+        """Read from buffer from STM32 to Jetson and return the current state.
+        
+        TODO:
+            - Decode packet sent from the STM32 controller
+            - If a robot is revived, the serial port might get garbage value in between
+            - implement a proper CRC-verified packet decoder
 
-        # TODO: implement a proper CRC-verified packet decoder
+        Returns:
+            dict: a dictionary containing the current state of the STM32
+        """
         blue_cnt = 0
         red_cnt = 0
 
@@ -163,6 +205,7 @@ class UARTCommunicator(object):
 
 
 if __name__ == '__main__':
+    # Testing example if run as main
     import sys
     import os
     # setting path
