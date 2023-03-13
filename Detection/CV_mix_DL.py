@@ -8,6 +8,7 @@ import Utils
 RED = 0
 BLUE = 1
 
+
 class cv_mix_dl_detector:
     """A routine that combines CV and DL to detect armors.
 
@@ -97,6 +98,7 @@ class cv_mix_dl_detector:
             self.armor_proposer.detect_color = color_num
         else:
             raise NotImplementedError
+
 
 class light_class:
     """
@@ -231,6 +233,7 @@ class armor_class:
         self.number_image = cv2.cvtColor(self.number_image, cv2.COLOR_RGB2GRAY)
         thres, self.number_image = cv2.threshold(
             self.number_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
 
 class cv_armor_proposer:
     """Armor proposer using OpenCV."""
@@ -589,6 +592,7 @@ class cv_armor_proposer:
             armor.armor_type = 'small'
 
         return light_ratio_ok and center_dist_ok and angle_ok
+
 
 class dl_digit_classifier:
     """Classify digits in armor number using deep learning model."""

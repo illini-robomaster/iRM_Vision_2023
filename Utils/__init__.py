@@ -2,13 +2,16 @@
 import numpy as np
 import cv2
 
+
 def deg_to_rad(deg):
     """Convert degree to radian."""
     return deg * ((2 * np.pi) / 360)
 
+
 def rad_to_deg(rad):
     """Convert radian to degree."""
     return rad * (360. / (2 * np.pi))
+
 
 def auto_align_brightness(img, target_v=50):
     """Standardize brightness of image.
@@ -44,6 +47,7 @@ def auto_align_brightness(img, target_v=50):
         img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
         return img
 
+
 def color_test(rgb_img, rect, color):
     """Test if the color of the roi is the same as the given color.
 
@@ -58,7 +62,7 @@ def color_test(rgb_img, rect, color):
     # Internal ENUM
     RED = 0
     BLUE = 1
-    
+
     rgb_roi = rgb_img[rect[1]:rect[1] + rect[3], rect[0]:rect[0] + rect[2]]
     sum_r = np.sum(rgb_roi[:, :, 0])
     sum_b = np.sum(rgb_roi[:, :, 2])
@@ -66,6 +70,7 @@ def color_test(rgb_img, rect, color):
         return sum_r >= sum_b
     else:
         return sum_b >= sum_r
+
 
 def rect_contains(rect, pt):
     """Determine if a pt is inside a rect.

@@ -2,6 +2,32 @@
 
 repo for iRM vision.
 
+## Contributing
+
+Now the repo uses CI to check code style. We decided pylint is too painful to use.
+Instead we use `pycodestyle` and `pydocstyle` to check if the code conform to autopep8
+and doc standards.
+
+Code that fails the CI will **NOT** be merged.
+
+To check if your code is conform to the standard, run
+
+```bash
+pycodestyle --max-line-length=100 .
+pydocstyle .
+```
+
+These two tools can be installed from either pip or anaconda.
+
+The CI will also tell if your code is failing, but please don't rely on repeatedly submitting
+commits to check your coding style.
+
+To automatically fix your code to autopep8 standard, you can run
+
+```bash
+autopep8 --in-place --aggressive --aggressive --recursive .
+```
+
 ## Data preparing
 
 We recorded some demo videos to demo auto-aiming capabilities of our robots,
