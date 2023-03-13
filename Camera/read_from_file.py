@@ -1,4 +1,4 @@
-# Read from file
+"""Hosts the fake camera class that reads from a file for testing."""
 import sys
 import time
 import numpy as np
@@ -7,13 +7,24 @@ import Utils
 
 # TODO: make an abstract camera base class
 
+class fake_camera:
+    """
+    Fake camera class that mimics the behavior of the real camera.
 
-class fake_camera(object):
+    It reads from a video file instead.
+    """
+
     # Needs to be calibrated per camera
     YAW_FOV_HALF = Utils.deg_to_rad(42) / 2
     PITCH_FOV_HALF = Utils.deg_to_rad(42) / 2
 
     def __init__(self, width, height):
+        """Initialize fake camera.
+
+        Args:
+            width (int): width of image to be resized to
+            height (int): height of image to be resized to
+        """
         self.width = width
         self.height = height
 
@@ -31,6 +42,14 @@ class fake_camera(object):
         self.frame_cnt = 0
 
     def get_frame(self):
+        """Call to get a frame from the camera.
+
+        Raises:
+            Exception: raised when video file is exhausted
+
+        Returns:
+            np.ndarray: RGB image frame
+        """
         if self.timing is None:
             self.timing = time.time()
 
