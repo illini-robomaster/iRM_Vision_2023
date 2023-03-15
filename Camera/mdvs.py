@@ -125,6 +125,7 @@ class mdvs_camera:
 
             frame = cv2.resize(
                 frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            return frame
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                 print(
