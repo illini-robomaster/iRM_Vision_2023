@@ -4,6 +4,10 @@ import serial
 import crc
 import time
 import threading
+from copy import deepcopy
+
+# STM32 to Jetson packet size
+STJ_PACKET_SIZE = 6
 
 
 class UARTCommunicator:
@@ -14,7 +18,7 @@ class UARTCommunicator:
             cfg,
             crc_standard=crc.Crc8.MAXIM_DOW,
             endianness='little',
-            buffer_size=10):
+            buffer_size=STJ_PACKET_SIZE * 100):
         """Initialize the UART communicator.
 
         Args:
@@ -34,17 +38,47 @@ class UARTCommunicator:
         self.circular_buffer = []
         self.buffer_size = buffer_size
 
-        self.enemy_color = self.cfg.DEFAULT_ENEMY_TEAM
-        self.stm32_color = 'red' if self.enemy_color == 'blue' else 'blue'
+        self.stm32_state_dict = {
+            'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
+            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower()}
 
+        self.parsed_packet_cnt = 0
         self.seq_num = 0
+
+        self.state_dict_lock = threading.Lock()
+
+    def start_listening(self):
+        """Start a thread to listen to the serial port."""
+        self.listen_thread = threading.Thread(target=self.listen_)
+        self.listen_thread.start()
+
+    def listen_(self, interval=0.001):
+        """
+        Listen to the serial port.
+
+        This function updates circular_buffer and stm32_state_dict.
+
+        TODO: test this function on real jetson / STM32!
+
+        Args:
+            interval (float): interval between two reads
+        """
+        while True:
+            self.try_read_one()
+            self.packet_search()
+            time.sleep(interval)
 
     def is_valid(self):
         """Return if communicator is valid."""
         return self.serial_port is not None
 
     def try_read_one(self):
-        """Try to read one packet from the serial port and store to internal buffer."""
+        """
+        Try to read one packet from the serial port and store to internal buffer.
+
+        Returns:
+            bool: True if a packet is read; False otherwise
+        """
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
             if (self.serial_port.inWaiting() > 0):
@@ -57,6 +91,10 @@ class UARTCommunicator:
                         # pop first element
                         self.circular_buffer = self.circular_buffer[1:]
                     self.circular_buffer.append(c)
+
+                return True
+            else:
+                return False
 
     def process_one_packet(self, header, yaw_offset, pitch_offset):
         """Process a batch of numbers into a CRC-checked packet and send it out.
@@ -114,6 +152,72 @@ class UARTCommunicator:
 
         return serial_port
 
+    def packet_search(self):
+        """Parse internal circular buffer."""
+        start_idx = 0
+        while start_idx <= len(self.circular_buffer) - STJ_PACKET_SIZE:
+            header_letters = (
+                self.circular_buffer[start_idx], self.circular_buffer[start_idx + 1])
+            if header_letters == (ord('H'), ord('D')):
+                # Try to parse
+                possible_packet = self.circular_buffer[start_idx:start_idx + STJ_PACKET_SIZE]
+                ret_dict = self.try_parse_one(possible_packet)
+                if ret_dict is not None:
+                    # Successfully parsed one
+                    self.parsed_packet_cnt += 1
+                    self.state_dict_lock.acquire()
+                    self.stm32_state_dict = ret_dict
+                    self.state_dict_lock.release()
+                    # Remove parsed bytes from the circular buffer
+                    self.circular_buffer = self.circular_buffer[start_idx +
+                                                                STJ_PACKET_SIZE:]
+                    start_idx = 0
+            else:
+                start_idx += 1
+
+    def try_parse_one(self, possible_packet):
+        """
+        Parse a possible packet.
+
+        For details on the struct of the packet, refer to docs/comm_protocol.md
+
+        Args:
+            possible_packet (list): a list of bytes
+
+        Returns:
+            dict: a dictionary of parsed data; None if parsing failed
+        """
+        assert len(possible_packet) == STJ_PACKET_SIZE
+        assert possible_packet[0] == ord('H')
+        assert possible_packet[1] == ord('D')
+
+        # Check packet end
+        if possible_packet[-2] != ord('E') or possible_packet[-1] != ord('D'):
+            return None
+
+        # Compute checksum
+        crc_checksum = self.crc_calculator.checksum(
+            bytes(possible_packet[:-3]))
+        if crc_checksum != possible_packet[-3]:
+            return None
+
+        # Valid packet
+
+        # 0 for RED; 1 for BLUE
+        my_color_int = int(possible_packet[2])
+
+        if my_color_int == 0:
+            my_color = 'red'
+            enemy_color = 'blue'
+        else:
+            my_color = 'blue'
+            enemy_color = 'red'
+
+        return {
+            'my_color': my_color,
+            'enemy_color': enemy_color,
+        }
+
     def create_packet(self, header, yaw_offset, pitch_offset):
         """
         Create CRC-checked packet from user input.
@@ -170,38 +274,10 @@ class UARTCommunicator:
         return packet
 
     def get_current_stm32_state(self):
-        """Read from buffer from STM32 to Jetson and return the current state.
-
-        TODO:
-            - Decode packet sent from the STM32 controller
-            - If a robot is revived, the serial port might get garbage value in between
-            - implement a proper CRC-verified packet decoder
-
-        Returns:
-            dict: a dictionary containing the current state of the STM32
-        """
-        blue_cnt = 0
-        red_cnt = 0
-
-        for read_byte in self.circular_buffer:
-            if read_byte == ord('R'):
-                red_cnt += 1
-            if read_byte == ord('B'):
-                blue_cnt += 1
-
-        if blue_cnt > red_cnt:
-            self.stm32_color = 'blue'
-            self.enemy_color = 'red'
-
-        if red_cnt > blue_cnt:
-            self.stm32_color = 'red'
-            self.enemy_color = 'blue'
-
-        ret_dict = {
-            'my_color': self.stm32_color,
-            'enemy_color': self.enemy_color,
-        }
-
+        """Read from buffer from STM32 to Jetson and return the current state."""
+        self.state_dict_lock.acquire()
+        ret_dict = deepcopy(self.stm32_state_dict)
+        self.state_dict_lock.release()
         return ret_dict
 
 
@@ -213,6 +289,25 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     import config
     uart = UARTCommunicator(config)
+
+    print("Starting packet sending test.")
     for i in range(1000):
         time.sleep(0.005)  # simulate 200Hz
         uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
+
+    print("Packet sending test complete.")
+    print("You should see the light change from bllue to green on type C board.")
+    print("Starting packet receiving test.")
+
+    while True:
+        if uart.parsed_packet_cnt == 1000:
+            print("Receiver successfully parsed exactly 1000 packets.")
+            break
+        if uart.parsed_packet_cnt > 1000:
+            print("Repeatedly parsed one packet?")
+            break
+        uart.try_read_one()
+        uart.packet_search()
+        time.sleep(0.001)
+
+    print("Packet receiving test complete.")

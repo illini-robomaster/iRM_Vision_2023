@@ -5,10 +5,10 @@ import numpy as np
 import cv2
 import Utils
 
-# TODO: make an abstract camera base class
+from Camera.camera_base import CameraBase
 
 
-class fake_camera:
+class fake_camera(CameraBase):
     """
     Fake camera class that mimics the behavior of the real camera.
 
@@ -19,15 +19,13 @@ class fake_camera:
     YAW_FOV_HALF = Utils.deg_to_rad(42) / 2
     PITCH_FOV_HALF = Utils.deg_to_rad(42) / 2
 
-    def __init__(self, width, height):
+    def __init__(self, cfg):
         """Initialize fake camera.
 
         Args:
-            width (int): width of image to be resized to
-            height (int): height of image to be resized to
+            cfg (python object): shared config object
         """
-        self.width = width
-        self.height = height
+        super().__init__(cfg)
 
         assert len(sys.argv) == 2  # main py file; video file
         video_path = sys.argv[1]

@@ -22,7 +22,7 @@ def main():
 
     communicator = UARTCommunicator(config)
 
-    autoaim_camera = config.AUTOAIM_CAMERA(config.IMG_WIDTH, config.IMG_HEIGHT)
+    autoaim_camera = config.AUTOAIM_CAMERA(config)
 
     if communicator.is_valid():
         print("OPENED SERIAL DEVICE AT: " + communicator.serial_port.name)

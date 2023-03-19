@@ -29,8 +29,10 @@ decoding are sent, they need to be encoded in little endianness. However, for st
 layouts are not affected by endianness.
 
 ### HEADER
+
 2 ASCII chars. Current options are 'ST' and 'MY', which stands for "Search Target"
 and "Move Yoke".
+
 - **ST**: The "Search Target" mode means either 1) the AutoAim algorithm is not engaged
     or 2) the AutoAim algorithm is engaged but the target is not found. In the former case, the
     STM32 board should simply ignore input from the Jetson board. In the latter case, the STM32
@@ -69,6 +71,32 @@ PACK_END (i.e., CRC is computed for the first 14 bytes up to end to REL_PITCH).
 
 # Protocol from STM32 to Jetson
 
-TODO: to be implemented. The first implementation should tell Jetson what is the color of
-the armor of our own robots. However it should be implemented in a generic manner so that
-subsequent implementations can easily add other useful information.
+## Packet Struct
+
+| Name          | Content                   | Size    |
+| ------------- | ------------------------- | ------- |
+| HEADER        | 2 ASCII char              | 2 bytes |
+| MY_COLOR      | uint8_t ENUM              | 1 byte  |
+| CRC_CHECKSUM  | uint8_t checksum          | 1 bytes |
+| PACK_END      | 2 ASCII char              | 2 bytes |
+| TOTAL         |                           | 6 bytes |
+
+Following the same convention as above, the memory layout of the STM32 is little-endian.
+
+### HEADER
+
+2 ASCII chars. Now the header can only be 'HD'.
+
+### MY_COLOR
+
+uint8_t ENUM. This is the color of the robot. 0 stands for red, 1 stands for blue.
+
+### CRC_CHECKSUM
+
+uint8_t checksum. This is the CRC checksum of the packet. The CRC standard used
+is the MAXIM_DOW standard. The CRC checksum is calculated on the packet contents BEFORE the
+PACK_END (i.e., CRC is computed for bytes preceeding, but not including, the CRC_CHECKSUM).
+
+### PACK_END
+
+2 ASCII chars. This is the end of the packet denoted by ASCII characters 'ED'.

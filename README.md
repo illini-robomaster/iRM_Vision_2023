@@ -25,8 +25,10 @@ commits to check your coding style.
 To automatically fix your code to autopep8 standard, you can run
 
 ```bash
-autopep8 --in-place --aggressive --aggressive --recursive .
+autopep8 --in-place --aggressive --aggressive xxx.py
 ```
+
+Remember to change `xxx.py` to file you want to modify.
 
 ## Data preparing
 
@@ -45,7 +47,7 @@ Please follow instruction from the RMCV101 repo [here](https://github.com/illini
 - Implement a more robust tracker (e.g., EKF / Kalman)
 - Implement depth estimators (either use D455 or estimate from monocular cameras)
 - Optimize code efficiency on Jetson
-- Implememt MDVS camera driver in Python
+- Update building instruction for getting video files / MDVS SDK
 
 ## File Structure
 
