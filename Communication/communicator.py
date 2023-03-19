@@ -4,6 +4,7 @@ import serial
 import crc
 import time
 import threading
+from copy import deepcopy
 
 # STM32 to Jetson packet size
 STJ_PACKET_SIZE = 6
@@ -44,12 +45,40 @@ class UARTCommunicator:
         self.parsed_packet_cnt = 0
         self.seq_num = 0
 
+        self.state_dict_lock = threading.Lock()
+
+    def start_listening(self):
+        """Start a thread to listen to the serial port."""
+        self.listen_thread = threading.Thread(target=self.listen_)
+        self.listen_thread.start()
+
+    def listen_(self, interval=0.001):
+        """
+        Listen to the serial port.
+
+        This function updates circular_buffer and stm32_state_dict.
+
+        TODO: test this function on real jetson / STM32!
+
+        Args:
+            interval (float): interval between two reads
+        """
+        while True:
+            self.try_read_one()
+            self.packet_search()
+            time.sleep(interval)
+
     def is_valid(self):
         """Return if communicator is valid."""
         return self.serial_port is not None
 
     def try_read_one(self):
-        """Try to read one packet from the serial port and store to internal buffer."""
+        """
+        Try to read one packet from the serial port and store to internal buffer.
+
+        Returns:
+            bool: True if a packet is read; False otherwise
+        """
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
             if (self.serial_port.inWaiting() > 0):
@@ -62,6 +91,10 @@ class UARTCommunicator:
                         # pop first element
                         self.circular_buffer = self.circular_buffer[1:]
                     self.circular_buffer.append(c)
+
+                return True
+            else:
+                return False
 
     def process_one_packet(self, header, yaw_offset, pitch_offset):
         """Process a batch of numbers into a CRC-checked packet and send it out.
@@ -132,7 +165,9 @@ class UARTCommunicator:
                 if ret_dict is not None:
                     # Successfully parsed one
                     self.parsed_packet_cnt += 1
+                    self.state_dict_lock.acquire()
                     self.stm32_state_dict = ret_dict
+                    self.state_dict_lock.release()
                     # Remove parsed bytes from the circular buffer
                     self.circular_buffer = self.circular_buffer[start_idx +
                                                                 STJ_PACKET_SIZE:]
@@ -240,7 +275,10 @@ class UARTCommunicator:
 
     def get_current_stm32_state(self):
         """Read from buffer from STM32 to Jetson and return the current state."""
-        return self.stm32_state_dict
+        self.state_dict_lock.acquire()
+        ret_dict = deepcopy(self.stm32_state_dict)
+        self.state_dict_lock.release()
+        return ret_dict
 
 
 if __name__ == '__main__':
