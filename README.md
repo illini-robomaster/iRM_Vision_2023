@@ -25,10 +25,8 @@ commits to check your coding style.
 To automatically fix your code to autopep8 standard, you can run
 
 ```bash
-autopep8 --in-place --aggressive --aggressive xxx.py
+autopep8 --in-place --aggressive --aggressive --max-line-length=100 --exclude="mvsdk.py" --recursive .
 ```
-
-Remember to change `xxx.py` to file you want to modify.
 
 ## Data preparing
 

@@ -83,8 +83,7 @@ class UARTCommunicator:
         if self.serial_port is not None:
             if (self.serial_port.inWaiting() > 0):
                 # read the bytes and convert from binary array to ASCII
-                byte_array = self.serial_port.read(
-                    self.serial_port.inWaiting())
+                byte_array = self.serial_port.read(self.serial_port.inWaiting())
 
                 for c in byte_array:
                     if len(self.circular_buffer) >= self.buffer_size:
@@ -169,8 +168,7 @@ class UARTCommunicator:
                     self.stm32_state_dict = ret_dict
                     self.state_dict_lock.release()
                     # Remove parsed bytes from the circular buffer
-                    self.circular_buffer = self.circular_buffer[start_idx +
-                                                                STJ_PACKET_SIZE:]
+                    self.circular_buffer = self.circular_buffer[start_idx + STJ_PACKET_SIZE:]
                     start_idx = 0
             else:
                 start_idx += 1
@@ -196,8 +194,7 @@ class UARTCommunicator:
             return None
 
         # Compute checksum
-        crc_checksum = self.crc_calculator.checksum(
-            bytes(possible_packet[:-3]))
+        crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:-3]))
         if crc_checksum != possible_packet[-3]:
             return None
 
@@ -255,10 +252,8 @@ class UARTCommunicator:
         discrete_pitch_offset = int(pitch_offset * 1e+6)
 
         # TODO: add more sanity check here?
-        packet += (discrete_yaw_offset &
-                   0xFFFFFFFF).to_bytes(4, self.endianness)
-        packet += (discrete_pitch_offset &
-                   0xFFFFFFFF).to_bytes(4, self.endianness)
+        packet += (discrete_yaw_offset & 0xFFFFFFFF).to_bytes(4, self.endianness)
+        packet += (discrete_pitch_offset & 0xFFFFFFFF).to_bytes(4, self.endianness)
 
         # Compute CRC
         crc8_checksum = self.crc_calculator.checksum(packet)
