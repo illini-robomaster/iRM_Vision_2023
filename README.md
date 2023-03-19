@@ -25,8 +25,10 @@ commits to check your coding style.
 To automatically fix your code to autopep8 standard, you can run
 
 ```bash
-autopep8 --in-place --aggressive --aggressive --recursive .
+autopep8 --in-place --aggressive --aggressive xxx.py
 ```
+
+Remember to change `xxx.py` to file you want to modify.
 
 ## Data preparing
 
