@@ -40,7 +40,7 @@ class UARTCommunicator:
 
         self.stm32_state_dict = {
             'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
-            'my_color_str': self.cfg.DEFAULT_ENEMY_TEAM.lower()}
+            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower()}
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
