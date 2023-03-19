@@ -5,8 +5,10 @@ import mvsdk
 import time
 import Utils
 
+from Camera.camera_base import CameraBase
 
-class mdvs_camera:
+
+class mdvs_camera(CameraBase):
     """MDVS camera driver.
 
     Adapted from official MDVS SDK example code, which is located at
@@ -27,11 +29,7 @@ class mdvs_camera:
         Args:
             cfg (python object): shared config object
         """
-        self.cfg = cfg
-        self.width = self.cfg.IMG_WIDTH
-        self.height = self.cfg.IMG_HEIGHT
-
-        self.exposure_time = int(self.cfg.EXPOSURE_TIME)  # in ms
+        super().__init__(cfg)
 
         # Enumerate camera devices
         DevList = mvsdk.CameraEnumerateDevice()

@@ -5,10 +5,10 @@ import numpy as np
 import cv2
 import Utils
 
-# TODO: make an abstract camera base class
+from Camera.camera_base import CameraBase
 
 
-class fake_camera:
+class fake_camera(CameraBase):
     """
     Fake camera class that mimics the behavior of the real camera.
 
@@ -25,9 +25,7 @@ class fake_camera:
         Args:
             cfg (python object): shared config object
         """
-        self.cfg = cfg
-        self.width = self.cfg.IMG_WIDTH
-        self.height = self.cfg.IMG_HEIGHT
+        super().__init__(cfg)
 
         assert len(sys.argv) == 2  # main py file; video file
         video_path = sys.argv[1]
