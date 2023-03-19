@@ -1,6 +1,7 @@
 """Base class for all camera implementations."""
 from abc import abstractmethod
 
+
 class CameraBase:
     """Base class for all camera implementations."""
 
