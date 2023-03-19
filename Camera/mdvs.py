@@ -16,19 +16,22 @@ class mdvs_camera:
         https://mindvision.com.cn/rjxz/list_12.aspx?lcid=139
     """
 
-    # Needs to be calibrated per camera
-    YAW_FOV_HALF = Utils.deg_to_rad(42) / 2
-    PITCH_FOV_HALF = Utils.deg_to_rad(42) / 2
+    # Computed using the tool at https://mindvision.com.cn/jtxx/list_108.aspx?lcid=21&lcids=1656
+    # Config: 4mm lens, MV-SUA133GC
+    YAW_FOV_HALF = Utils.deg_to_rad(65.238) / 2
+    PITCH_FOV_HALF = Utils.deg_to_rad(54.225) / 2
 
-    def __init__(self, width, height):
+    def __init__(self, cfg):
         """Initialize the MDVS camera.
 
         Args:
-            width (int): width of image to be resized to
-            height (int): height of image to be resized to
+            cfg (python object): shared config object
         """
-        self.width = width
-        self.height = height
+        self.cfg = cfg
+        self.width = self.cfg.IMG_WIDTH
+        self.height = self.cfg.IMG_HEIGHT
+
+        self.exposure_time = int(self.cfg.EXPOSURE_TIME)  # in ms
 
         # Enumerate camera devices
         DevList = mvsdk.CameraEnumerateDevice()
@@ -73,7 +76,7 @@ class mdvs_camera:
 
         # Set to manual exposure mode and set exposure time to 30ms
         mvsdk.CameraSetAeState(self.cam, 0)
-        mvsdk.CameraSetExposureTime(self.cam, 30 * 1000)
+        mvsdk.CameraSetExposureTime(self.cam, self.exposure_time * 1000)
 
         # Calls SDK internal thread to start grabbing images
         # If in trigger mode, the image grabbing won't start until a trigger

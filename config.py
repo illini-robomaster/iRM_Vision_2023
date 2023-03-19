@@ -11,6 +11,9 @@ PACK_END = b'ED'
 
 AUTOAIM_CAMERA = fake_camera
 
+# This param needs to be tuned per arena / camera setup
+EXPOSURE_TIME = 30
+
 # Compute some constants and define camera to use
 IMG_HEIGHT = 360
 IMG_WIDTH = 640
