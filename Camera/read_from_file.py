@@ -47,7 +47,7 @@ class fake_camera(CameraBase):
             Exception: raised when video file is exhausted
 
         Returns:
-            np.ndarray: RGB image frame
+            np.ndarray: BGR image frame
         """
         if self.timing is None:
             self.timing = time.time()
