@@ -1,6 +1,7 @@
 """Config file that is shared across the whole project."""
 
 # communication utils
+from Camera.simple_cv import simple_cv_camera
 SEARCH_TARGET = b'ST'
 MOVE_YOKE = b'MY'
 PACK_END = b'ED'
@@ -8,7 +9,6 @@ PACK_END = b'ED'
 # Define camera
 # from Camera.d455 import D455_camera
 # from Camera.read_from_file import fake_camera
-from Camera.simple_cv import simple_cv_camera
 
 AUTOAIM_CAMERA = simple_cv_camera
 

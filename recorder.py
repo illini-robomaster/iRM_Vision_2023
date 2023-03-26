@@ -14,6 +14,7 @@ import datetime
 TIME_PER_CLIP = 10  # in seconds
 FPS_LIMIT = 1. / 100
 
+
 def main():
     """Define the main while-true control loop that manages everything."""
     autoaim_camera = config.AUTOAIM_CAMERA(config)
