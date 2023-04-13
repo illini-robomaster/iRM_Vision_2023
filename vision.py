@@ -30,6 +30,9 @@ def main():
     else:
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
 
+    # Initialize KF tracker
+    tracker = KalmanTracker()
+
     while True:
         start = time.time()
         frame = autoaim_camera.get_frame()
@@ -68,8 +71,6 @@ def main():
 
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
-        tracker = KalmanTracker()
-
         ret_dict = aimer.process_one(pred, enemy_team, frame, tracker)
 
         if config.DEBUG_DISPLAY:
