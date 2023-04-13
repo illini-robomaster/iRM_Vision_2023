@@ -8,6 +8,7 @@ in config.py
 import time
 import cv2
 from Aiming.Aim import Aim
+from Aiming.Tracking import KalmanTracker
 # from Detection.YOLO import Yolo
 from Detection.CV_mix_DL import cv_mix_dl_detector
 from Communication.communicator import UARTCommunicator
@@ -67,7 +68,9 @@ def main():
 
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
-        ret_dict = aimer.process_one(pred, enemy_team, frame)
+        tracker = KalmanTracker()
+
+        ret_dict = aimer.process_one(pred, enemy_team, frame, tracker)
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()

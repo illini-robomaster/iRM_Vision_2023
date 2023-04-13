@@ -1,5 +1,6 @@
 """Hosts the Aim class, which is the main class for auto-aiming."""
-from .Tracking import basic_tracker
+# from .Tracking import basic_tracker
+from .Tracking import KF_tracker, KalmanTracker
 
 
 class Aim:
@@ -21,9 +22,9 @@ class Aim:
             config (python object): shared config
         """
         self.CFG = config
-        self.tracker = basic_tracker(self.CFG)
+        self.tracker = KF_tracker(self.CFG)
 
-    def process_one(self, pred_list, enemy_team, rgb_img):
+    def process_one(self, pred_list, enemy_team, rgb_img, tracker):
         """Process one frame of predictions.
 
         Args:
@@ -39,7 +40,7 @@ class Aim:
         # TODO: use assertion to check enemy_team
 
         final_bbox_list, final_id_list = self.tracker.process_one(
-            pred_list, enemy_team, rgb_img)
+            pred_list, enemy_team, rgb_img, tracker)
 
         # TODO: integrate this into tracking for consistent tracking
         closet_pred, closet_dist = self.get_closet_pred(
