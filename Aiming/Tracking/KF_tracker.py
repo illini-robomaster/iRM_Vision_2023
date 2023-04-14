@@ -11,8 +11,14 @@ FRAME_BUFFER_SIZE = 10
 # TODO: this class should be part of abstract base tracker class
 
 
-class KalmanTracker:
+class KalmanTracker(object):
+    """A class that represents a Kalman Fitler tracker.
+
+    It is the matrix for KF tracking that will be stored in each armor.
+    """
     def __init__(self):
+        """Initialize from armor.  
+        """
         self.kalman = cv2.KalmanFilter(4, 2)
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
         self.kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
@@ -21,11 +27,22 @@ class KalmanTracker:
         self.prediction = np.zeros((2, 1), np.float32)
 
     def update(self, x, y):
+        """Update the value of KF_matrix.
+
+        Args:
+            x (int): detected x value
+            y (int): detected y value
+        """
         self.measurement = np.array([[x], [y]], np.float32)
         self.kalman.correct(self.measurement)
         self.prediction = self.kalman.predict()
 
     def get_prediction(self):
+        """Predict the x and y values
+
+        Returns:
+            tuple: predicted x and y values
+        """
         return int(self.prediction[0]), int(self.prediction[1])
 
 class tracked_armor(object):
@@ -48,6 +65,7 @@ class tracked_armor(object):
         self.roi_buffer = [roi]
         self.observed_frame_tick = [frame_tick]
         self.armor_id = armor_id  # unique ID
+        self.KF_matrix = KalmanTracker()
 
     def compute_cost(self, other_armor):
         """Compute the cost of matching this armor with another armor.
@@ -81,7 +99,7 @@ class tracked_armor(object):
         self.bbox_buffer = self.bbox_buffer[-FRAME_BUFFER_SIZE:]
         self.roi_buffer = self.roi_buffer[-FRAME_BUFFER_SIZE:]
 
-    def predict_bbox(self, cur_frame_tick, tracker):
+    def predict_bbox(self, cur_frame_tick):
         """Predict the bounding box of the tracked armor at cur frame tick.
 
         Args:
@@ -94,15 +112,20 @@ class tracked_armor(object):
         Returns:
             tuple: (center_x, center_y, w, h)
         """
-        if cur_frame_tick == self.observed_frame_tick[-1] or len(
-                self.bbox_buffer) == 1:
-            return self.bbox_buffer[-1]
-        else:
-            # KF tracking
-            c_x, c_y, w, h = self.bbox_buffer[-1]
-            tracker.update(c_x, c_y)
-            predicted_x, predicted_y = tracker.get_prediction()
-            return (int(predicted_x), int(predicted_y), w, h)
+        # if cur_frame_tick == self.observed_frame_tick[-1] or len(
+        #         self.bbox_buffer) == 1:
+        #     return self.bbox_buffer[-1]
+        # else:
+        #     # KF tracking
+        #     c_x, c_y, w, h = self.bbox_buffer[-1]
+        #     self.KF_matrix.update(c_x, c_y)
+        #     predicted_x, predicted_y = self.KF_matrix.get_prediction()
+        #     print("diedai")
+        #     return (int(predicted_x), int(predicted_y), w, h)
+        c_x, c_y, w, h = self.bbox_buffer[-1]
+        self.KF_matrix.update(c_x, c_y)
+        predicted_x, predicted_y = self.KF_matrix.get_prediction()
+        return (int(predicted_x), int(predicted_y), w, h)
 
 
 class KF_tracker(object):
@@ -125,7 +148,7 @@ class KF_tracker(object):
         self.id_gen = ConsistentIdGenerator()
         self.frame_tick = 0  # TODO: use timestamp may be a better idea
 
-    def process_one(self, pred_list, enemy_team, rgb_img, tracker):
+    def process_one(self, pred_list, enemy_team, rgb_img):
         """Process one set of detections and rgb images.
 
         Args:
@@ -183,7 +206,7 @@ class KF_tracker(object):
         ret_id_list = []
         for a in self.active_armors:
             # If an armor is observed, directly use the bbox
-            ret_bbox_list.append(a.predict_bbox(self.frame_tick, tracker))
+            ret_bbox_list.append(a.predict_bbox(self.frame_tick))
             ret_id_list.append(a.armor_id)
 
         self.frame_tick += 1

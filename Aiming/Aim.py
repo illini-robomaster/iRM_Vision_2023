@@ -24,7 +24,7 @@ class Aim:
         self.CFG = config
         self.tracker = KF_tracker(self.CFG)
 
-    def process_one(self, pred_list, enemy_team, rgb_img, tracker):
+    def process_one(self, pred_list, enemy_team, rgb_img):
         """Process one frame of predictions.
 
         Args:
@@ -40,7 +40,7 @@ class Aim:
         # TODO: use assertion to check enemy_team
 
         final_bbox_list, final_id_list = self.tracker.process_one(
-            pred_list, enemy_team, rgb_img, tracker)
+            pred_list, enemy_team, rgb_img)
 
         # TODO: integrate this into tracking for consistent tracking
         closet_pred, closet_dist = self.get_closet_pred(

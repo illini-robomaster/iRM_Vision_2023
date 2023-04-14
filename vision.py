@@ -30,9 +30,6 @@ def main():
     else:
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
 
-    # Initialize KF tracker
-    tracker = KalmanTracker()
-
     while True:
         start = time.time()
         frame = autoaim_camera.get_frame()
@@ -56,6 +53,41 @@ def main():
 
         elapsed = time.time() - start
 
+        # if config.DEBUG_DISPLAY:
+        #     viz_frame = frame.copy()
+        #     for _, _, bbox in pred:
+        #         lower_x = int(bbox[0] - bbox[2] / 2)
+        #         lower_y = int(bbox[1] - bbox[3] / 2)
+        #         upper_x = int(bbox[0] + bbox[2] / 2)
+        #         upper_y = int(bbox[1] + bbox[3] / 2)
+        #         viz_frame = cv2.rectangle(
+        #             viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+        #     cv2.imshow('all_detected', viz_frame)
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         exit(0)
+
+        # Tracking and filtering
+        # Pour all predictions into the aimer, which returns relative angles
+        ret_dict = aimer.process_one(pred, enemy_team, frame)
+
+        # if config.DEBUG_DISPLAY:
+        #     viz_frame = frame.copy()
+        #     for i in range(len(ret_dict['final_bbox_list'])):
+        #         bbox = ret_dict['final_bbox_list'][i]
+        #         unique_id = ret_dict['final_id_list'][i]
+        #         lower_x = int(bbox[0] - bbox[2] / 2)
+        #         lower_y = int(bbox[1] - bbox[3] / 2)
+        #         upper_x = int(bbox[0] + bbox[2] / 2)
+        #         upper_y = int(bbox[1] + bbox[3] / 2)
+        #         viz_frame = cv2.rectangle(
+        #             viz_frame, (lower_x, lower_y), (upper_x, upper_y), (255, 0, 0), 2)
+        #         viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
+        #                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        #     cv2.imshow('filtered_detected', viz_frame)
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         exit(0)
+
+        # Tracking with KF 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
             for _, _, bbox in pred:
@@ -64,17 +96,8 @@ def main():
                 upper_x = int(bbox[0] + bbox[2] / 2)
                 upper_y = int(bbox[1] + bbox[3] / 2)
                 viz_frame = cv2.rectangle(
-                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
-            cv2.imshow('all_detected', viz_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                exit(0)
+                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 3)
 
-        # Tracking and filtering
-        # Pour all predictions into the aimer, which returns relative angles
-        ret_dict = aimer.process_one(pred, enemy_team, frame, tracker)
-
-        if config.DEBUG_DISPLAY:
-            viz_frame = frame.copy()
             for i in range(len(ret_dict['final_bbox_list'])):
                 bbox = ret_dict['final_bbox_list'][i]
                 unique_id = ret_dict['final_id_list'][i]
@@ -83,12 +106,11 @@ def main():
                 upper_x = int(bbox[0] + bbox[2] / 2)
                 upper_y = int(bbox[1] + bbox[3] / 2)
                 viz_frame = cv2.rectangle(
-                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
-                viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.imshow('filtered_detected', viz_frame)
+                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (255, 0, 0), 2)
+            cv2.imshow('KF_tracking', viz_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
+
 
         # TODO: put this into debug display
         show_frame = frame.copy()
@@ -106,8 +128,8 @@ def main():
             communicator.process_one_packet(config.SEARCH_TARGET, 0, 0)
 
         if config.DEBUG_DISPLAY:
-            print('----------------\n', pred)
-            print('fps:', 1. / elapsed)
+            # print('----------------\n', pred)
+            # print('fps:', 1. / elapsed)
             cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
