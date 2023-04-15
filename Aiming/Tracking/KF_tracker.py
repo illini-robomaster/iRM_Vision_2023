@@ -22,7 +22,7 @@ class KalmanTracker(object):
         self.kalman = cv2.KalmanFilter(4, 2)
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
         self.kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
-        self.kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.03
+        self.kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.3
         self.measurement = np.array((2, 1), np.float32)
         self.prediction = np.zeros((2, 1), np.float32)
 
@@ -112,20 +112,26 @@ class tracked_armor(object):
         Returns:
             tuple: (center_x, center_y, w, h)
         """
-        # if cur_frame_tick == self.observed_frame_tick[-1] or len(
-        #         self.bbox_buffer) == 1:
-        #     return self.bbox_buffer[-1]
-        # else:
-        #     # KF tracking
-        #     c_x, c_y, w, h = self.bbox_buffer[-1]
-        #     self.KF_matrix.update(c_x, c_y)
-        #     predicted_x, predicted_y = self.KF_matrix.get_prediction()
-        #     print("diedai")
-        #     return (int(predicted_x), int(predicted_y), w, h)
-        c_x, c_y, w, h = self.bbox_buffer[-1]
-        self.KF_matrix.update(c_x, c_y)
-        predicted_x, predicted_y = self.KF_matrix.get_prediction()
-        return (int(predicted_x), int(predicted_y), w, h)
+        if cur_frame_tick == self.observed_frame_tick[-1] or len(
+                self.bbox_buffer) == 1:
+            # print(self.bbox_buffer[-1])
+            c_x, c_y, w, h = self.bbox_buffer[-1]
+            self.KF_matrix.update(c_x, c_y)
+            return self.bbox_buffer[-1]
+        else:
+            # KF tracking
+            c_x, c_y, w, h = self.bbox_buffer[-1]
+            predicted_x, predicted_y = self.KF_matrix.get_prediction()
+            self.KF_matrix.update(predicted_x, predicted_y)
+            # print(int(predicted_x), int(predicted_y), w, h)
+            # self.update(self, cur_frame_tick)
+            return (int(predicted_x), int(predicted_y), w, h)
+
+        # c_x, c_y, w, h = self.bbox_buffer[-1]
+        # self.KF_matrix.update(c_x, c_y)
+        # predicted_x, predicted_y = self.KF_matrix.get_prediction()
+        # # print(int(predicted_x), int(predicted_y), w, h)
+        # return (int(predicted_x), int(predicted_y), w, h)
 
 
 class KF_tracker(object):

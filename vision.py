@@ -30,6 +30,8 @@ def main():
     else:
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
 
+    paused = False
+
     while True:
         start = time.time()
         frame = autoaim_camera.get_frame()
@@ -107,9 +109,15 @@ def main():
                 upper_y = int(bbox[1] + bbox[3] / 2)
                 viz_frame = cv2.rectangle(
                     viz_frame, (lower_x, lower_y), (upper_x, upper_y), (255, 0, 0), 2)
+                viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
             cv2.imshow('KF_tracking', viz_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                exit(0)
+
+            key = cv2.waitKey(0 if paused else 100) & 0xFF
+            if key == ord('q'):  # Exit the loop when 'q' is pressed
+                break
+            elif key == ord('p'):  # Toggle pause when 'p' is pressed
+                paused = not paused
 
 
         # TODO: put this into debug display
