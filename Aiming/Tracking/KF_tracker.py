@@ -22,7 +22,11 @@ class KalmanTracker(object):
         self.kalman = cv2.KalmanFilter(4, 2)
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
         self.kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
-        self.kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.3
+        self.kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 0.03
+
+        initial_state = np.array([320, 180, 0, 0], np.float32) # initialize the KF position to center
+        self.kalman.statePre = initial_state
+
         self.measurement = np.array((2, 1), np.float32)
         self.prediction = np.zeros((2, 1), np.float32)
 
@@ -45,6 +49,33 @@ class KalmanTracker(object):
         """
         return int(self.prediction[0]), int(self.prediction[1])
 
+# class KalmanTracker(object): # 匀加速运动模型
+#     def __init__(self, dt):
+#         self.kalman = cv2.KalmanFilter(6, 2)
+#         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]], np.float32)
+#         self.kalman.transitionMatrix = np.array([
+#             [1, 0, dt, 0, 0.5*dt**2, 0],
+#             [0, 1, 0, dt, 0, 0.5*dt**2],
+#             [0, 0, 1, 0, dt, 0],
+#             [0, 0, 0, 1, 0, dt],
+#             [0, 0, 0, 0, 1, 0],
+#             [0, 0, 0, 0, 0, 1]], np.float32)
+#         self.kalman.processNoiseCov = np.eye(6, dtype=np.float32) * 0.03
+
+#         initial_state = np.array([320, 180, 0, 0, 0, 0], np.float32)  # initialize the KF position to center
+#         self.kalman.statePre = initial_state
+
+#         self.measurement = np.array((2, 1), np.float32)
+#         self.prediction = np.zeros((2, 1), np.float32)
+
+#     def update(self, x, y):
+#         self.measurement = np.array([[x], [y]], np.float32)
+#         self.kalman.correct(self.measurement)
+#         self.prediction = self.kalman.predict()
+
+#     def get_prediction(self):
+#         return int(self.prediction[0]), int(self.prediction[1])
+
 class tracked_armor(object):
     """A class that represents a tracked armor.
 
@@ -66,6 +97,7 @@ class tracked_armor(object):
         self.observed_frame_tick = [frame_tick]
         self.armor_id = armor_id  # unique ID
         self.KF_matrix = KalmanTracker()
+        # self.KF_matrix = KalmanTracker(0.05) # dt = 0.05
 
     def compute_cost(self, other_armor):
         """Compute the cost of matching this armor with another armor.
