@@ -277,6 +277,7 @@ class UARTCommunicator:
 
 
 if __name__ == '__main__':
+    TESTING_CRC = True
     # Testing example if run as main
     import sys
     import os
@@ -285,24 +286,29 @@ if __name__ == '__main__':
     import config
     uart = UARTCommunicator(config)
 
-    print("Starting packet sending test.")
-    for i in range(1000):
-        time.sleep(0.005)  # simulate 200Hz
-        uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
+    if TESTING_CRC:
+        print("Starting packet sending test.")
+        for i in range(1000):
+            time.sleep(0.005)  # simulate 200Hz
+            uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
 
-    print("Packet sending test complete.")
-    print("You should see the light change from bllue to green on type C board.")
-    print("Starting packet receiving test.")
+        print("Packet sending test complete.")
+        print("You should see the light change from bllue to green on type C board.")
+        print("Starting packet receiving test.")
 
-    while True:
-        if uart.parsed_packet_cnt == 1000:
-            print("Receiver successfully parsed exactly 1000 packets.")
-            break
-        if uart.parsed_packet_cnt > 1000:
-            print("Repeatedly parsed one packet?")
-            break
-        uart.try_read_one()
-        uart.packet_search()
-        time.sleep(0.001)
+        while True:
+            if uart.parsed_packet_cnt == 1000:
+                print("Receiver successfully parsed exactly 1000 packets.")
+                break
+            if uart.parsed_packet_cnt > 1000:
+                print("Repeatedly parsed one packet?")
+                break
+            uart.try_read_one()
+            uart.packet_search()
+            time.sleep(0.001)
 
-    print("Packet receiving test complete.")
+        print("Packet receiving test complete.")
+    else:
+         while True:
+            time.sleep(0.005)
+            uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)
