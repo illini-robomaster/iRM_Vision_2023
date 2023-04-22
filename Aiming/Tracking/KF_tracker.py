@@ -155,15 +155,7 @@ class tracked_armor(object):
             c_x, c_y, w, h = self.bbox_buffer[-1]
             predicted_x, predicted_y = self.KF_matrix.get_prediction()
             self.KF_matrix.update(predicted_x, predicted_y)
-            # print(int(predicted_x), int(predicted_y), w, h)
-            # self.update(self, cur_frame_tick)
             return (int(predicted_x), int(predicted_y), w, h)
-
-        # c_x, c_y, w, h = self.bbox_buffer[-1]
-        # self.KF_matrix.update(c_x, c_y)
-        # predicted_x, predicted_y = self.KF_matrix.get_prediction()
-        # # print(int(predicted_x), int(predicted_y), w, h)
-        # return (int(predicted_x), int(predicted_y), w, h)
 
 
 class KF_tracker(object):
