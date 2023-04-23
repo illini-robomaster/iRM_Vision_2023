@@ -1,10 +1,10 @@
 """Wrap the MDVS SDK to build a camera driver."""
 import cv2
 import numpy as np
-import mvsdk
 import time
 import Utils
 
+from Camera import mvsdk
 from Camera.camera_base import CameraBase
 
 
