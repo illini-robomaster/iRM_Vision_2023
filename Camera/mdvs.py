@@ -19,9 +19,9 @@ class mdvs_camera(CameraBase):
     """
 
     # Computed using the tool at https://mindvision.com.cn/jtxx/list_108.aspx?lcid=21&lcids=1656
-    # Config: 4mm lens, MV-SUA133GC
-    YAW_FOV_HALF = Utils.deg_to_rad(65.238) / 2
-    PITCH_FOV_HALF = Utils.deg_to_rad(54.225) / 2
+    # Config: 6mm lens, MV-SUA133GC
+    YAW_FOV_HALF = Utils.deg_to_rad(46.245) / 2
+    PITCH_FOV_HALF = Utils.deg_to_rad(37.761) / 2
 
     def __init__(self, cfg):
         """Initialize the MDVS camera.
