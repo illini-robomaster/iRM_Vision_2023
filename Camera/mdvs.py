@@ -126,6 +126,8 @@ class mdvs_camera(CameraBase):
 
             frame = cv2.resize(
                 frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            if self.cfg.ROTATE_180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
             return frame
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
