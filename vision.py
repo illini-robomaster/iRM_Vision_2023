@@ -102,9 +102,11 @@ def main():
                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             communicator.process_one_packet(config.SEARCH_TARGET, 0, 0)
 
-        if config.DEBUG_DISPLAY:
+        if config.DEBUG_PRINT:
             print('----------------\n', pred)
             print('fps:', 1. / elapsed)
+
+        if config.DEBUG_DISPLAY:
             cv2.imshow('target', show_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
