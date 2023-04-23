@@ -71,17 +71,18 @@ def main():
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
-            for i in range(len(ret_dict['final_bbox_list'])):
-                bbox = ret_dict['final_bbox_list'][i]
-                unique_id = ret_dict['final_id_list'][i]
-                lower_x = int(bbox[0] - bbox[2] / 2)
-                lower_y = int(bbox[1] - bbox[3] / 2)
-                upper_x = int(bbox[0] + bbox[2] / 2)
-                upper_y = int(bbox[1] + bbox[3] / 2)
-                viz_frame = cv2.rectangle(
-                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
-                viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            if ret_dict:
+                for i in range(len(ret_dict['final_bbox_list'])):
+                    bbox = ret_dict['final_bbox_list'][i]
+                    unique_id = ret_dict['final_id_list'][i]
+                    lower_x = int(bbox[0] - bbox[2] / 2)
+                    lower_y = int(bbox[1] - bbox[3] / 2)
+                    upper_x = int(bbox[0] + bbox[2] / 2)
+                    upper_y = int(bbox[1] + bbox[3] / 2)
+                    viz_frame = cv2.rectangle(
+                        viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+                    viz_frame = cv2.putText(viz_frame, str(unique_id), (lower_x, lower_y),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.imshow('filtered_detected', viz_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 exit(0)
