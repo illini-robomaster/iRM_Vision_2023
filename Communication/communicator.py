@@ -93,7 +93,6 @@ class UARTCommunicator:
                         # pop first element
                         self.circular_buffer = self.circular_buffer[1:]
                     self.circular_buffer.append(c)
-
                 return True
             else:
                 return False
@@ -206,8 +205,8 @@ class UARTCommunicator:
         # 0 for RED; 1 for BLUE
         my_color_int = int(possible_packet[2])
 
-        cur_yaw = int.from_bytes(possible_packet[3:7], "little") / INT_FP_SCALE
-        cur_pitch = int.from_bytes(possible_packet[7:11], "little") / INT_FP_SCALE
+        cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
+        cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
 
         if my_color_int == 0:
             my_color = 'red'
@@ -285,7 +284,7 @@ class UARTCommunicator:
 
 
 if __name__ == '__main__':
-    TESTING_CRC = True
+    TESTING_CRC = False
     # Testing example if run as main
     import sys
     import os
@@ -318,6 +317,14 @@ if __name__ == '__main__':
         print(uart.get_current_stm32_state())
         print("Packet receiving test complete.")
     else:
+        cur_packet_cnt = uart.parsed_packet_cnt
         while True:
-            time.sleep(0.005)
-            uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)
+            uart.try_read_one()
+            uart.packet_search()
+            if uart.parsed_packet_cnt > cur_packet_cnt:
+                cur_packet_cnt = uart.parsed_packet_cnt
+                print(uart.get_current_stm32_state())
+            time.sleep(0.001)
+        # while True:
+        #     time.sleep(0.005)
+        #     uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)
