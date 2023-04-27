@@ -7,7 +7,8 @@ import threading
 from copy import deepcopy
 
 # STM32 to Jetson packet size
-STJ_PACKET_SIZE = 6
+STJ_PACKET_SIZE = 14
+INT_FP_SCALE = 1e+6
 
 
 class UARTCommunicator:
@@ -40,7 +41,9 @@ class UARTCommunicator:
 
         self.stm32_state_dict = {
             'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
-            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower()}
+            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
+            'cur_yaw': 0,
+            'cur_pitch': 0}
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -167,9 +170,9 @@ class UARTCommunicator:
                     self.state_dict_lock.acquire()
                     self.stm32_state_dict = ret_dict
                     self.state_dict_lock.release()
-                    # Remove parsed bytes from the circular buffer
-                    self.circular_buffer = self.circular_buffer[start_idx + STJ_PACKET_SIZE:]
-                    start_idx = 0
+                # Remove parsed bytes from the circular buffer
+                self.circular_buffer = self.circular_buffer[start_idx + STJ_PACKET_SIZE:]
+                start_idx = 0
             else:
                 start_idx += 1
 
@@ -203,6 +206,9 @@ class UARTCommunicator:
         # 0 for RED; 1 for BLUE
         my_color_int = int(possible_packet[2])
 
+        cur_yaw = int.from_bytes(possible_packet[3:7], "little") / INT_FP_SCALE
+        cur_pitch = int.from_bytes(possible_packet[7:11], "little") / INT_FP_SCALE
+
         if my_color_int == 0:
             my_color = 'red'
             enemy_color = 'blue'
@@ -213,6 +219,8 @@ class UARTCommunicator:
         return {
             'my_color': my_color,
             'enemy_color': enemy_color,
+            'cur_yaw': cur_yaw,
+            'cur_pitch': cur_pitch,
         }
 
     def create_packet(self, header, yaw_offset, pitch_offset):
@@ -248,8 +256,8 @@ class UARTCommunicator:
             self.seq_num = self.seq_num % (2 ** 32)
         packet += (self.seq_num & 0xFFFFFFFF).to_bytes(4, self.endianness)
 
-        discrete_yaw_offset = int(yaw_offset * 1e+6)
-        discrete_pitch_offset = int(pitch_offset * 1e+6)
+        discrete_yaw_offset = int(yaw_offset * INT_FP_SCALE)
+        discrete_pitch_offset = int(pitch_offset * INT_FP_SCALE)
 
         # TODO: add more sanity check here?
         packet += (discrete_yaw_offset & 0xFFFFFFFF).to_bytes(4, self.endianness)
@@ -307,8 +315,9 @@ if __name__ == '__main__':
             uart.packet_search()
             time.sleep(0.001)
 
+        print(uart.get_current_stm32_state())
         print("Packet receiving test complete.")
     else:
-         while True:
+        while True:
             time.sleep(0.005)
             uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)

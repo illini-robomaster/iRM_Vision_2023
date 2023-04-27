@@ -130,7 +130,7 @@ class Aim:
             (self.CFG.AUTOAIM_CAMERA.YAW_FOV_HALF / self.CFG.IMG_CENTER_X)
         pitch_diff = (bbox_center_y - self.CFG.IMG_CENTER_Y) * \
             (self.CFG.AUTOAIM_CAMERA.PITCH_FOV_HALF / self.CFG.IMG_CENTER_Y)
-        
+
         yaw_diff = -yaw_diff  # counter-clockwise is positive
         pitch_diff = pitch_diff  # down is positive
 
