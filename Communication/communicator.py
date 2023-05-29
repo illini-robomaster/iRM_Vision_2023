@@ -135,6 +135,7 @@ class UARTCommunicator:
         for dev_name in dev_list:
             if dev_name.startswith(UART_PREFIX_LIST):
                 try:
+                    print("Trying to open serial port: {}".format(dev_name))
                     dev_path = os.path.join("/dev", dev_name)
                     serial_port = serial.Serial(
                         port=dev_path,
@@ -318,13 +319,20 @@ if __name__ == '__main__':
         print("Packet receiving test complete.")
     else:
         cur_packet_cnt = uart.parsed_packet_cnt
+        cur_time = time.time()
+        prv_parsed_packet_cnt = 0
         while True:
             uart.try_read_one()
             uart.packet_search()
             if uart.parsed_packet_cnt > cur_packet_cnt:
                 cur_packet_cnt = uart.parsed_packet_cnt
-                print(uart.get_current_stm32_state())
+                # print(uart.get_current_stm32_state())
             time.sleep(0.001)
+            if time.time() > cur_time + 1:
+                print("Parsed {} packets in 1 second.".format(
+                    cur_packet_cnt - prv_parsed_packet_cnt))
+                prv_parsed_packet_cnt = cur_packet_cnt
+                cur_time = time.time()
         # while True:
         #     time.sleep(0.005)
         #     uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)

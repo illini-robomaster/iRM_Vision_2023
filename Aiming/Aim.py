@@ -1,6 +1,6 @@
 """Hosts the Aim class, which is the main class for auto-aiming."""
 from .Tracking import basic_tracker
-
+import numpy as np
 
 class Aim:
     """
@@ -23,13 +23,14 @@ class Aim:
         self.CFG = config
         self.tracker = basic_tracker(self.CFG)
 
-    def process_one(self, pred_list, enemy_team, rgb_img):
+    def process_one(self, pred_list, enemy_team, rgb_img, stm32_state_dict):
         """Process one frame of predictions.
 
         Args:
             pred_list (list): a list of predictions
             enemy_team (str): 'blue' or 'red'
             rgb_img (np.ndarray): RGB image
+            stm32_state_dict (dict): a dictionary of stm32 state
 
         Returns:
             dict: a dictionary of results
@@ -54,10 +55,20 @@ class Aim:
 
         calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(
             yaw_diff, pitch_diff, closet_dist)
+    
+        # Clip yaw/pitch differences to [-2pi, 2pi]
+        calibrated_pitch_diff = np.clip(calibrated_pitch_diff, -2*np.pi, 2*np.pi)
+        calibrated_yaw_diff = np.clip(calibrated_yaw_diff, -2*np.pi, 2*np.pi)
+
+        # Compute absolute yaw / pitch
+        abs_pitch = calibrated_pitch_diff + stm32_state_dict['cur_pitch']
+        abs_yaw = calibrated_yaw_diff + stm32_state_dict['cur_yaw']
 
         return {
             'yaw_diff': calibrated_yaw_diff,
             'pitch_diff': calibrated_pitch_diff,
+            'abs_yaw': abs_yaw,
+            'abs_pitch': abs_pitch,
             'center_x': center_x,
             'center_y': center_y,
             'final_bbox_list': final_bbox_list,

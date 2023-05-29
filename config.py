@@ -23,8 +23,8 @@ IMG_WIDTH = 640
 IMG_CENTER_X = IMG_WIDTH // 2
 IMG_CENTER_Y = IMG_HEIGHT // 2
 
-DEBUG_DISPLAY = False
-DEBUG_PRINT = True
+DEBUG_DISPLAY = True
+DEBUG_PRINT = False
 DEFAULT_ENEMY_TEAM = 'red'
 
 ROTATE_180 = True  # Camera is mounted upside down

@@ -21,6 +21,7 @@ def main():
     aimer = Aim(config)
 
     communicator = UARTCommunicator(config)
+    communicator.start_listening()
 
     autoaim_camera = config.AUTOAIM_CAMERA(config)
 
@@ -31,11 +32,11 @@ def main():
 
     while True:
         start = time.time()
+        stm32_state_dict = communicator.get_current_stm32_state()
         frame = autoaim_camera.get_frame()
 
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
-        stm32_state_dict = communicator.get_current_stm32_state()
         enemy_team = stm32_state_dict['enemy_color']
         model.change_color(enemy_team)
 
@@ -67,7 +68,7 @@ def main():
 
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
-        ret_dict = aimer.process_one(pred, enemy_team, frame)
+        ret_dict = aimer.process_one(pred, enemy_team, frame, stm32_state_dict)
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
@@ -91,8 +92,10 @@ def main():
         show_frame = frame.copy()
 
         if ret_dict:
+            print("Current yaw angle: ", stm32_state_dict['cur_yaw'])
+            print("Target abs Yaw angle: ", ret_dict['abs_yaw'])
             communicator.process_one_packet(
-                config.MOVE_YOKE, ret_dict['yaw_diff'], ret_dict['pitch_diff'])
+                config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
             show_frame = cv2.circle(show_frame,
                                     (int(ret_dict['center_x']),
                                      int(ret_dict['center_y'])),
