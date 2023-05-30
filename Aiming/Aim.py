@@ -2,6 +2,7 @@
 from .Tracking import basic_tracker
 import numpy as np
 
+
 class Aim:
     """
     The main class for auto-aiming.
@@ -55,10 +56,10 @@ class Aim:
 
         calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(
             yaw_diff, pitch_diff, closet_dist)
-    
+
         # Clip yaw/pitch differences to [-2pi, 2pi]
-        calibrated_pitch_diff = np.clip(calibrated_pitch_diff, -2*np.pi, 2*np.pi)
-        calibrated_yaw_diff = np.clip(calibrated_yaw_diff, -2*np.pi, 2*np.pi)
+        calibrated_pitch_diff = np.clip(calibrated_pitch_diff, -2 * np.pi, 2 * np.pi)
+        calibrated_yaw_diff = np.clip(calibrated_yaw_diff, -2 * np.pi, 2 * np.pi)
 
         # Compute absolute yaw / pitch
         abs_pitch = calibrated_pitch_diff + stm32_state_dict['cur_pitch']
