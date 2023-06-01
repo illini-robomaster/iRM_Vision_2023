@@ -16,24 +16,27 @@ class KalmanTracker(object):
 
     It is the matrix for KF tracking that will be stored in each armor.
     """
+
     def __init__(self):
-        """Initialize from armor.  
-        """
+        """Initialize from armor."""
         self.kalman = cv2.KalmanFilter(4, 2)
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
-        self.kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+        self.kalman.transitionMatrix = np.array(
+            [[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
         self.kalman.measurementNoiseCov = np.array([[1, 0], [0, 1]], np.float32) * 1
-        self.kalman.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 1
+        self.kalman.processNoiseCov = np.array(
+            [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 1
         self.kalman.controlMatrix = np.array([[0.5, 0],
                                               [0, 0.5],
                                               [1, 0],
                                               [0, 1]], np.float32)
-        initial_state = np.array([320, 180, 0, 0], np.float32) # initialize the KF position to center
+        # initialize the KF position to center
+        initial_state = np.array([320, 180, 0, 0], np.float32)
         self.kalman.statePre = initial_state
 
         self.measurement = np.array((2, 1), np.float32)
         self.prediction = np.zeros((2, 1), np.float32)
-        self.acceleration = np.array((2,1), np.float32)
+        self.acceleration = np.array((2, 1), np.float32)
 
     def update(self, x, y):
         """Update the value of KF_matrix.
@@ -42,25 +45,27 @@ class KalmanTracker(object):
             x (int): detected x value
             y (int): detected y value
         """
-        acceleration = np.array([[(x - self.measurement[0])],[(y - self.measurement[1])]], np.float32)
+        acceleration = np.array(
+            [[(x - self.measurement[0])], [(y - self.measurement[1])]], np.float32)
         self.measurement = np.array([[x], [y]], np.float32)
-        #self.kalman.transitionMatrix[2, 0] = 0.5 * acceleration[0, 0]
-        #self.kalman.transitionMatrix[3, 1] = 0.5 * acceleration[1, 0]
+        # self.kalman.transitionMatrix[2, 0] = 0.5 * acceleration[0, 0]
+        # self.kalman.transitionMatrix[3, 1] = 0.5 * acceleration[1, 0]
         self.kalman.correct(self.measurement)
         self.prediction = self.kalman.predict()
 
     def get_prediction(self):
-        """Predict the x and y values
+        """Predict the x and y values.
 
         Returns:
             tuple: predicted x and y values
         """
         return int(self.prediction[0]), int(self.prediction[1])
 
-# class KalmanTracker(object): # 匀加速运动模型
+# class KalmanTracker(object): # assume constant acceleration
 #     def __init__(self, dt):
 #         self.kalman = cv2.KalmanFilter(6, 2)
-#         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]], np.float32)
+#         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0, 0, 0],
+#                                                   [0, 1, 0, 0, 0, 0]], np.float32)
 #         self.kalman.transitionMatrix = np.array([
 #             [1, 0, dt, 0, 0.5*dt**2, 0],
 #             [0, 1, 0, dt, 0, 0.5*dt**2],
@@ -70,7 +75,8 @@ class KalmanTracker(object):
 #             [0, 0, 0, 0, 0, 1]], np.float32)
 #         self.kalman.processNoiseCov = np.eye(6, dtype=np.float32) * 0.03
 
-#         initial_state = np.array([320, 180, 0, 0, 0, 0], np.float32)  # initialize the KF position to center
+#         # initialize the KF position to center
+#         initial_state = np.array([320, 180, 0, 0, 0, 0], np.float32)
 #         self.kalman.statePre = initial_state
 
 #         self.measurement = np.array((2, 1), np.float32)
@@ -83,6 +89,7 @@ class KalmanTracker(object):
 
 #     def get_prediction(self):
 #         return int(self.prediction[0]), int(self.prediction[1])
+
 
 class tracked_armor(object):
     """A class that represents a tracked armor.
@@ -250,4 +257,3 @@ class KF_tracker(object):
         self.frame_tick += 1
 
         return ret_bbox_list, ret_id_list
-
