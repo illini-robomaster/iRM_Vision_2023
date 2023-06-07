@@ -7,7 +7,7 @@ import threading
 from copy import deepcopy
 
 # STM32 to Jetson packet size
-STJ_PACKET_SIZE = 14
+STJ_PACKET_SIZE = 18
 INT_FP_SCALE = 1e+6
 
 
@@ -43,7 +43,8 @@ class UARTCommunicator:
             'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
             'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
             'cur_yaw': 0,
-            'cur_pitch': 0}
+            'cur_pitch': 0,
+            'debug_int': 0}
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -208,6 +209,7 @@ class UARTCommunicator:
 
         cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
         cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
+        debug_int = int.from_bytes(possible_packet[11:15], "little", signed=True)
 
         if my_color_int == 0:
             my_color = 'red'
@@ -221,6 +223,7 @@ class UARTCommunicator:
             'enemy_color': enemy_color,
             'cur_yaw': cur_yaw,
             'cur_pitch': cur_pitch,
+            'debug_int': debug_int,
         }
 
     def create_packet(self, header, yaw_offset, pitch_offset):

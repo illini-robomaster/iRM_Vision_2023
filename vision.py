@@ -43,19 +43,19 @@ def main():
         pred = model.detect(frame)
 
         for i in range(len(pred)):
-            name, conf, bbox = pred[i]
+            name, conf, armor_type, bbox, armor = pred[i]
             # name from C++ string is in bytes; decoding is needed
             if isinstance(name, bytes):
                 name_str = name.decode('utf-8')
             else:
                 name_str = name
-            pred[i] = (name_str, conf, bbox)
+            pred[i] = (name_str, conf, armor_type, bbox, armor)
 
         elapsed = time.time() - start
 
         if config.DEBUG_DISPLAY:
             viz_frame = frame.copy()
-            for _, _, bbox in pred:
+            for _, _, _, bbox, _ in pred:
                 lower_x = int(bbox[0] - bbox[2] / 2)
                 lower_y = int(bbox[1] - bbox[3] / 2)
                 upper_x = int(bbox[0] + bbox[2] / 2)
