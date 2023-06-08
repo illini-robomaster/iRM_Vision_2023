@@ -1,23 +1,49 @@
-import numpy as np
-import config
-import Utils
-
+"""Hosts the Aim class, which is the main class for auto-aiming."""
 from .Tracking import basic_tracker
 
+
 class Aim:
+    """
+    The main class for auto-aiming.
+
+    Its workflow:
+        1. takes in a list of predictions from the detection module
+        2. apply tracker to fill in missing predictions / append or associate predictions
+        3. It selects a single armor to hit
+        4. It computes the yaw/pitch difference to the armor
+        5. Finally, apply posterior calibration (e.g., range table to hit far targets)
+    """
+
     def __init__(self, config):
+        """Get the config and initialize the tracker.
+
+        Args:
+            config (python object): shared config
+        """
         self.CFG = config
         self.tracker = basic_tracker(self.CFG)
 
     def process_one(self, pred_list, enemy_team, rgb_img):
+        """Process one frame of predictions.
+
+        Args:
+            pred_list (list): a list of predictions
+            enemy_team (str): 'blue' or 'red'
+            rgb_img (np.ndarray): RGB image
+
+        Returns:
+            dict: a dictionary of results
+        """
         assert enemy_team in ['blue', 'red']
 
         # TODO: use assertion to check enemy_team
 
-        final_bbox_list, final_id_list = self.tracker.process_one(pred_list, enemy_team, rgb_img)
+        final_bbox_list, final_id_list = self.tracker.process_one(
+            pred_list, enemy_team, rgb_img)
 
         # TODO: integrate this into tracking for consistent tracking
-        closet_pred, closet_dist = self.get_closet_pred(final_bbox_list, rgb_img)
+        closet_pred, closet_dist = self.get_closet_pred(
+            final_bbox_list, rgb_img)
 
         if closet_pred is None:
             return None
@@ -26,7 +52,8 @@ class Aim:
         # Get yaw/pitch differences in radians
         yaw_diff, pitch_diff = self.get_rotation_angle(center_x, center_y)
 
-        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(yaw_diff, pitch_diff, closet_dist)
+        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(
+            yaw_diff, pitch_diff, closet_dist)
 
         return {
             'yaw_diff': calibrated_yaw_diff,
@@ -36,10 +63,12 @@ class Aim:
             'final_bbox_list': final_bbox_list,
             'final_id_list': final_id_list,
         }
-    
+
     def posterior_calibration(self, yaw_diff, pitch_diff, distance):
-        """Given a set of naively estimated parameters, return calibrated parameters
-        from a range table?
+        """Given a set of naively estimated parameters, return calibrated parameters.
+
+        Idea:
+            Use a range table?
 
         Args:
             yaw_diff (float): yaw difference in radians
@@ -56,15 +85,24 @@ class Aim:
             # In this case, distance comes from D455 stereo estimation
             # TODO: compute a range table
             return (yaw_diff, pitch_diff)
-    
+
     def get_closet_pred(self, bbox_list, rgb_img):
-        '''Get the closet prediction to camera focal point'''
-        # TODO: instead of camera focal point; calibrate closet pred to operator view
+        """Get the closet prediction to camera focal point.
+
+        Args:
+            bbox_list (list): a list of bounding boxes
+            rgb_img (np.ndarray): RGB image
+
+        Returns:
+            (bbox_list, float): closet_pred, closet_dist
+        """
+        # TODO: instead of camera focal point; calibrate closet pred to
+        # operator view
         H, W, C = rgb_img.shape
         focal_y = H / 2
         focal_x = W / 2
         closet_pred = None
-        closet_dist = None # Cloest to camera in z-axis
+        closet_dist = None  # Cloest to camera in z-axis
         closet_dist = 99999999
         for bbox in bbox_list:
             center_x, center_y, width, height = bbox
@@ -78,9 +116,22 @@ class Aim:
                     closet_dist = cur_dist
         return closet_pred, closet_dist
 
-    @staticmethod
-    def get_rotation_angle(bbox_center_x, bbox_center_y):
-        yaw_diff = (bbox_center_x - config.IMG_CENTER_X) * (config.AUTOAIM_CAMERA.YAW_FOV_HALF / config.IMG_CENTER_X)
-        pitch_diff = (bbox_center_y - config.IMG_CENTER_Y) * (config.AUTOAIM_CAMERA.PITCH_FOV_HALF / config.IMG_CENTER_Y)
+    def get_rotation_angle(self, bbox_center_x, bbox_center_y):
+        """Given a bounding box center, return the yaw/pitch difference in radians.
+
+        Args:
+            bbox_center_x (float): x coordinate of the center of the bounding box
+            bbox_center_y (float): y coordinate of the center of the bounding box
+
+        Returns:
+            (float, float): yaw_diff, pitch_diff in radians
+        """
+        yaw_diff = (bbox_center_x - self.CFG.IMG_CENTER_X) * \
+            (self.CFG.AUTOAIM_CAMERA.YAW_FOV_HALF / self.CFG.IMG_CENTER_X)
+        pitch_diff = (bbox_center_y - self.CFG.IMG_CENTER_Y) * \
+            (self.CFG.AUTOAIM_CAMERA.PITCH_FOV_HALF / self.CFG.IMG_CENTER_Y)
+        
+        yaw_diff = -yaw_diff  # counter-clockwise is positive
+        pitch_diff = pitch_diff  # down is positive
 
         return yaw_diff, pitch_diff
