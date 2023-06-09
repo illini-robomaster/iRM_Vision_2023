@@ -5,7 +5,7 @@ import numpy as np
 from .consistent_id_gen import ConsistentIdGenerator
 
 # TODO: move this to config
-FRAME_BUFFER_SIZE = 10
+FRAME_BUFFER_SIZE = 1
 
 # TODO: this class should be part of abstract base tracker class
 
