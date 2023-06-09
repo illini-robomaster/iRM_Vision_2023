@@ -5,7 +5,7 @@ import numpy as np
 from .consistent_id_gen import ConsistentIdGenerator
 
 # TODO: move this to config
-FRAME_BUFFER_SIZE = 10
+FRAME_BUFFER_SIZE = 1
 
 # TODO: this class should be part of abstract base tracker class
 
@@ -123,7 +123,7 @@ class basic_tracker(object):
             (list, list): list of tracked_armors (detections+predictions) and their IDs
         """
         new_armors = []
-        for name, conf, bbox in pred_list:
+        for name, conf, armor_type, bbox, armor in pred_list:
             c_x, c_y, w, h = bbox
             lower_x = int(c_x - w / 2)
             upper_x = int(c_x + w / 2)
@@ -155,7 +155,7 @@ class basic_tracker(object):
         for n in new_armors:
             n.armor_id = self.id_gen.get_id()
 
-        # Maintain current buffer. If an armor has not been observed by 10
+        # Maintain current buffer. If an armor has not been observed by FRAME_BUFFER_SIZE
         # frames, it is dropped
         self.active_armors = [i for i in self.active_armors
                               if self.frame_tick - i.observed_frame_tick[-1] < FRAME_BUFFER_SIZE]

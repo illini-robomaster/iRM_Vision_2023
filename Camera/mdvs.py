@@ -1,10 +1,10 @@
 """Wrap the MDVS SDK to build a camera driver."""
 import cv2
 import numpy as np
-import mvsdk
 import time
 import Utils
 
+from Camera import mvsdk
 from Camera.camera_base import CameraBase
 
 
@@ -19,9 +19,9 @@ class mdvs_camera(CameraBase):
     """
 
     # Computed using the tool at https://mindvision.com.cn/jtxx/list_108.aspx?lcid=21&lcids=1656
-    # Config: 4mm lens, MV-SUA133GC
-    YAW_FOV_HALF = Utils.deg_to_rad(65.238) / 2
-    PITCH_FOV_HALF = Utils.deg_to_rad(54.225) / 2
+    # Config: 6mm lens, MV-SUA133GC
+    YAW_FOV_HALF = Utils.deg_to_rad(46.245) / 2
+    PITCH_FOV_HALF = Utils.deg_to_rad(37.761) / 2
 
     def __init__(self, cfg):
         """Initialize the MDVS camera.
@@ -126,6 +126,8 @@ class mdvs_camera(CameraBase):
 
             frame = cv2.resize(
                 frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            if self.cfg.ROTATE_180:
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
             return frame
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:

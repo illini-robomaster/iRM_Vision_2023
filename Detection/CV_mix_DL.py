@@ -66,12 +66,10 @@ class cv_mix_dl_detector:
         for armor in armor_list:
             center_x, center_y = armor.center
             height = (armor.left_light.length + armor.right_light.length) / 2
-            width = cv2.norm(armor.left_light.center -
-                             armor.right_light.center)
+            width = cv2.norm(armor.left_light.center - armor.right_light.center)
             bbox = (center_x, center_y, width, height)
             name = f'armor_{self.detect_color_str}'
-            conf = armor.confidence
-            ret_list.append((name, conf, bbox))
+            ret_list.append((name, float(armor.confidence), str(armor.number[0]), bbox, armor))
         return ret_list
 
     def change_color(self, new_color):
@@ -598,7 +596,7 @@ class dl_digit_classifier:
     """Classify digits in armor number using deep learning model."""
 
     LABEL_NAMES_LIST = np.array(['B', '1', '2', '3', '4', '5', 'G', 'O', 'N'])
-    CLASSIFIER_THRESHOLD = 0.7
+    CLASSIFIER_THRESHOLD = 0.9
 
     def __init__(self, config, model_path):
         """Initialize the classifier.
@@ -640,13 +638,13 @@ class dl_digit_classifier:
             max_class = softmax_probs.argmax(axis=1)
             max_class_names = self.LABEL_NAMES_LIST[max_class]
 
-            if softmax_probs[0,
-                             max_class] < self.CLASSIFIER_THRESHOLD or max_class_names == 'N':
+            if softmax_probs[0, max_class] < self.CLASSIFIER_THRESHOLD or max_class_names == 'N':
                 continue
 
             # TODO: use digit predictions to improve accuracy?
             # Right now using that logic causes a lot of false negatives...
             armor.confidence = softmax_probs[0, max_class]
+            armor.number = max_class_names
             ret_list.append(armor)
 
         return ret_list
