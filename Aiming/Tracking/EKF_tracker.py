@@ -1,4 +1,4 @@
-"""Implemented EKF tracker with filterpy library"""
+"""Implemented EKF tracker with filterpy library."""
 import scipy.optimize
 import numpy as np
 from filterpy.kalman import ExtendedKalmanFilter
@@ -8,63 +8,65 @@ from .consistent_id_gen import ConsistentIdGenerator
 # TODO: move this to config
 FRAME_BUFFER_SIZE = 10
 
+
 class KalmanTracker(object):
     """A class that represents a Kalman Fitler tracker.
 
     It is the matrix for KF tracking that will be stored in each armor.
     """
+
     def __init__(self):
-        """Initialize EKF from armor.  
-        """
+        """Initialize EKF from armor."""
         dt = 1
-        self.kalman = ExtendedKalmanFilter(dim_x=6,dim_z=2)
-        #F:transition matrix
-        self.kalman.F = np.array([[1, 0, dt, 0, 0.5*(dt**2), 0], 
-                                    [0, 1, 0, dt,0, 0.5*(dt**2)], 
-                                    [0, 0, 1, 0, dt, 0], 
-                                    [0, 0, 0, 1, 0, dt],
-                                    [0, 0, 0, 0, 1, 0],
-                                    [0, 0, 0, 0, 0, 1]], np.float32)
-        #x:initial state初始状态 initialize the KF position to center
-        self.kalman.x = np.array([320, 180, 0, 0, 0 ,0])
-        #R:measurement noise matrix
-        #self.kalman.R *= 10
+        self.kalman = ExtendedKalmanFilter(dim_x=6, dim_z=2)
+        # F:transition matrix
+        self.kalman.F = np.array([[1, 0, dt, 0, 0.5 * (dt**2), 0],
+                                  [0, 1, 0, dt, 0, 0.5 * (dt**2)],
+                                  [0, 0, 1, 0, dt, 0],
+                                  [0, 0, 0, 1, 0, dt],
+                                  [0, 0, 0, 0, 1, 0],
+                                  [0, 0, 0, 0, 0, 1]], np.float32)
+        # x:initial state初始状态 initialize the KF position to center
+        self.kalman.x = np.array([320, 180, 0, 0, 0, 0])
+        # R:measurement noise matrix
+        # self.kalman.R *= 10
         self.kalman.R = np.array([[1, 0], [0, 1]], np.float32) * 1
-        #Q:process noise matrix
+        # Q:process noise matrix
         self.kalman.Q = np.eye(6)
-        #P:初始协方差矩阵, 初始状态很不确定时把这个拧大一点
-        self.kalman.P *= 10 
-        #measurement and prediction
+        # P:初始协方差矩阵, 初始状态很不确定时把这个拧大一点
+        self.kalman.P *= 10
+        # measurement and prediction
         self.measurement = np.array((2, 1), np.float32)
         self.prediction = np.zeros((2, 1), np.float32)
 
     def H_of(self, x):
-    # H矩阵的jacobian
-    # 观测模型是线性的，所以H矩阵实际上是恒定的，与x无关
+        """Compute the jacobian of the measurement function."""
+        # Jocobian of the measurement function H
+        # The measurement model is linear, so the H matrix is
+        # actually constant and independent of x
         return np.array([[1, 0, 0, 0, 0, 0],
-                  [0, 1, 0, 0, 0, 0]])
+                         [0, 1, 0, 0, 0, 0]])
 
-    def hx(self,x):
-    # 将状态向量转成测量向量
-    # 直接返回x和y的坐标作为测量值
+    def hx(self, x):
+        """Compute the measurement from the state vector x."""
+        # Return x and y directly as the measurement
         return np.array([x[0], x[1]])
-    
+
     def update(self, x, y):
+        """Update the state of this armor with matched armor."""
         self.measurement = np.array([x, y], np.float32)
         self.kalman.update(self.measurement, self.H_of, self.hx)
         self.kalman.predict()
         self.prediction = self.kalman.x
 
     def get_prediction(self):
-        """Predict the x and y values
+        """Predict the x and y values.
 
         Returns:
             tuple: predicted x and y values
         """
-
         return int(self.prediction[0]), int(self.prediction[1])
 
-    
 
 class tracked_armor(object):
     """A class that represents a tracked armor.
@@ -87,8 +89,6 @@ class tracked_armor(object):
         self.observed_frame_tick = [frame_tick]
         self.armor_id = armor_id  # unique ID
         self.KF_matrix = KalmanTracker()
-        
-
 
     def compute_cost(self, other_armor):
         """Compute the cost of matching this armor with another armor.
@@ -147,88 +147,3 @@ class tracked_armor(object):
             predicted_x, predicted_y = self.KF_matrix.get_prediction()
             self.KF_matrix.update(predicted_x, predicted_y)
             return (int(predicted_x), int(predicted_y), w, h)
-
-
-class KF_tracker(object):
-    """
-    EKF tracker
-    """
-
-    SE_THRESHOLD = 3200  # (40, 40) pixels away
-
-    def __init__(self, config):
-        """simple EKF.
-
-        Args:
-            config (python object): shared config
-        """
-        self.CFG = config
-        self.active_armors = []
-        self.id_gen = ConsistentIdGenerator()
-        self.frame_tick = 0  # TODO: use timestamp may be a better idea
-
-
-    def process_one(self, pred_list, enemy_team, rgb_img):
-        """Process one set of detections and rgb images.
-
-        Args:
-            pred_list (list): list of (name, conf, bbox) tuples
-            enemy_team (str): enemy team name (blue or red)
-            rgb_img (np.ndarray): RGB image
-
-        Returns:
-            (list, list): list of tracked_armors (detections+predictions) and their IDs
-        """
-        new_armors = []
-        for name, conf, bbox in pred_list:
-            c_x, c_y, w, h = bbox
-            lower_x = int(c_x - w / 2)
-            upper_x = int(c_x + w / 2)
-            lower_y = int(c_y - h / 2)
-            upper_y = int(c_y + h / 2)
-            roi = rgb_img[lower_y:upper_y, lower_x:upper_x]
-            new_armors.append(tracked_armor(bbox, roi, self.frame_tick, -1))
-
-        if len(self.active_armors) > 0:
-            # Try to associate with current armors
-            cost_matrix = np.zeros(
-                (len(new_armors), len(self.active_armors)), dtype=float)
-            for i in range(len(new_armors)):
-                for j in range(len(self.active_armors)):
-                    cost_ij = new_armors[i].compute_cost(self.active_armors[j])
-                    cost_matrix[i, j] = cost_ij
-            row_ind, col_ind = scipy.optimize.linear_sum_assignment(
-                cost_matrix)
-
-            for i, j in zip(row_ind, col_ind):
-                if cost_matrix[i, j] < self.SE_THRESHOLD:
-                    assert new_armors[i] is not None
-                    self.active_armors[j].update(
-                        new_armors[i], self.frame_tick)
-                    new_armors[i] = None
-
-        new_armors = [i for i in new_armors if i is not None]
-
-        for n in new_armors:
-            n.armor_id = self.id_gen.get_id()
-
-        # Maintain current buffer. If an armor has not been observed by 10
-        # frames, it is dropped
-        self.active_armors = [i for i in self.active_armors
-                              if self.frame_tick - i.observed_frame_tick[-1] < FRAME_BUFFER_SIZE]
-
-        # Unassociated armors are registered as new armors
-        for a in new_armors:
-            self.active_armors.append(a)
-
-        # Create a list of bbox and unique IDs to return
-        ret_bbox_list = []
-        ret_id_list = []
-        for a in self.active_armors:
-            # If an armor is observed, directly use the bbox
-            ret_bbox_list.append(a.predict_bbox(self.frame_tick))
-            ret_id_list.append(a.armor_id)
-
-        self.frame_tick += 1
-
-        return ret_bbox_list, ret_id_list
