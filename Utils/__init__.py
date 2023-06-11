@@ -84,3 +84,55 @@ def rect_contains(rect, pt):
     """
     return rect[0] < pt[0] < rect[0] + \
         rect[2] and rect[1] < pt[1] < rect[1] + rect[3]
+
+
+def get_intrinsic_matrix(cfg):
+    """Get the camera intrinsic matrix.
+
+    Args:
+        cfg (object): config.py node object
+
+    Returns:
+        K: camera intrinsic matrix 3x3
+    """
+    if hasattr(cfg, 'K'):
+        return cfg.K
+    elif hasattr(cfg.AUTOAIM_CAMERA, 'K'):
+        return cfg.AUTOAIM_CAMERA.K
+    else:
+        # Infer from image size
+        K = np.eye(3)
+
+        H = cfg.IMG_HEIGHT
+        W = cfg.IMG_WIDTH
+        fl = min(H, W) * 2
+        cx = W / 2
+        cy = H / 2
+
+        K[0, 0] = fl
+        K[1, 1] = fl
+        K[0, 2] = cx
+        K[1, 2] = cy
+
+        return K
+
+def get_radian_diff(angle1, angle2):
+    """Compute the abs difference between two angles in radians.
+
+    Parameters:
+    angle1 (float): First angle in radians.
+    angle2 (float): Second angle in radians.
+
+    Returns:
+    float: The difference between the angles in radians, ranging from 0 to pi.
+    """
+    # Normalize angles to be between 0 and 2*pi
+    angle1 = angle1 % (2 * np.pi)
+    angle2 = angle2 % (2 * np.pi)
+
+    # Compute the difference along the lesser arc
+    diff = abs(angle1 - angle2)
+    if diff > np.pi:
+        diff = 2 * np.pi - diff
+
+    return diff
