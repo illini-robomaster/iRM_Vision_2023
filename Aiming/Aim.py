@@ -1,6 +1,10 @@
 """Hosts the Aim class, which is the main class for auto-aiming."""
 from .Tracking import basic_tracker
+from .DistEst import pnp_estimator
 import numpy as np
+import Utils
+
+from IPython import embed
 
 
 class Aim:
@@ -23,6 +27,66 @@ class Aim:
         """
         self.CFG = config
         self.tracker = basic_tracker(self.CFG)
+        self.distance_estimator = pnp_estimator(self.CFG)
+
+    def preprocess(self, pred_list, stm32_state_dict, rgb_img):
+        """Preprocess predictions to compute armor distances and absolute yaw/pitch.
+
+        Args:
+            pred_list (list): a list of predictions
+            stm32_state_dict (dict): a dictionary of stm32 state
+
+        Returns:
+            list: a list of tuples (armor_type, abs_yaw, abs_pitch, y_distance, z_distance)
+        """
+        gimbal_yaw = stm32_state_dict['cur_yaw']
+        gimbal_pitch = stm32_state_dict['cur_pitch']
+
+        ret_list = []
+
+        for pred in pred_list:
+            armor_name, conf, armor_type, bbox, armor = pred
+            c_x, c_y, w, h = bbox
+            rel_yaw, rel_pitch = self.get_rotation_angle(c_x, c_y)
+            abs_yaw = gimbal_yaw + rel_yaw
+            abs_pitch = gimbal_pitch + rel_pitch
+            y_distance, z_distance = self.distance_estimator.estimate_distance(armor, rgb_img)
+
+            ret_list.append((armor_type, abs_yaw, abs_pitch, y_distance, z_distance))
+
+        return ret_list
+
+    def pick_target(self, distance_angle_list, stm32_state_dict):
+        """Select a priortized target from a list of targets.
+
+        Args:
+            distance_angle_list (list): list of targets returned from tracker
+            stm32_state_dict (dict): a dictionary of stm32 state
+
+        Returns:
+            target: a tuple of (target_pitch, target_yaw, target_y_dist, target_z_dist)
+        """
+        gimbal_pitch = stm32_state_dict['cur_pitch']
+        gimbal_yaw = stm32_state_dict['cur_yaw']
+
+        target_pitch = None
+        target_yaw = None
+        target_y_dist = None
+        target_z_dist = None
+        min_angle_diff = 9999
+
+        for y_dist, z_dist, predicted_pitch, predicted_yaw in distance_angle_list:
+            pitch_diff = Utils.get_radian_diff(predicted_pitch, gimbal_pitch)
+            yaw_diff = Utils.get_radian_diff(predicted_yaw, gimbal_yaw)
+            angle_diff = pitch_diff + yaw_diff
+            if angle_diff < min_angle_diff:
+                target_pitch = predicted_pitch
+                target_yaw = predicted_yaw
+                target_y_dist = y_dist
+                target_z_dist = z_dist
+                min_angle_diff = angle_diff
+
+        return target_pitch, target_yaw, target_y_dist, target_z_dist
 
     def process_one(self, pred_list, enemy_team, rgb_img, stm32_state_dict):
         """Process one frame of predictions.
@@ -38,45 +102,34 @@ class Aim:
         """
         assert enemy_team in ['blue', 'red']
 
-        # TODO: use assertion to check enemy_team
+        observed_armors = self.preprocess(pred_list, stm32_state_dict, rgb_img)
 
-        final_bbox_list, final_id_list = self.tracker.process_one(
-            pred_list, enemy_team, rgb_img)
+        distance_angle_list, final_id_list = self.tracker.process_one(
+            observed_armors, enemy_team, rgb_img)
 
         # TODO: integrate this into tracking for consistent tracking
-        closet_pred, closet_dist = self.get_closet_pred(
-            final_bbox_list, rgb_img)
+        target_dist_angle_tuple = self.pick_target(distance_angle_list, stm32_state_dict)
 
-        if closet_pred is None:
+        if target_dist_angle_tuple[0] is None:
             return None
-        center_x, center_y, width, height = closet_pred
 
-        # Get yaw/pitch differences in radians
-        yaw_diff, pitch_diff = self.get_rotation_angle(center_x, center_y)
+        target_pitch, target_yaw, target_y_dist, target_z_dist = target_dist_angle_tuple
 
-        calibrated_yaw_diff, calibrated_pitch_diff = self.posterior_calibration(
-            yaw_diff, pitch_diff, closet_dist)
-
-        # Clip yaw/pitch differences to [-2pi, 2pi]
-        calibrated_pitch_diff = np.clip(calibrated_pitch_diff, -2 * np.pi, 2 * np.pi)
-        calibrated_yaw_diff = np.clip(calibrated_yaw_diff, -2 * np.pi, 2 * np.pi)
-
-        # Compute absolute yaw / pitch
-        abs_pitch = calibrated_pitch_diff + stm32_state_dict['cur_pitch']
-        abs_yaw = calibrated_yaw_diff + stm32_state_dict['cur_yaw']
+        calibrated_pitch, calibrated_yaw = self.posterior_calibration(
+            target_pitch, target_yaw, target_y_dist, target_z_dist)
 
         return {
-            'yaw_diff': calibrated_yaw_diff,
-            'pitch_diff': calibrated_pitch_diff,
-            'abs_yaw': abs_yaw,
-            'abs_pitch': abs_pitch,
-            'center_x': center_x,
-            'center_y': center_y,
-            'final_bbox_list': final_bbox_list,
-            'final_id_list': final_id_list,
+            # 'yaw_diff': calibrated_yaw_diff,
+            # 'pitch_diff': calibrated_pitch_diff,
+            'abs_yaw': calibrated_yaw,
+            'abs_pitch': calibrated_pitch,
+            # 'center_x': center_x,
+            # 'center_y': center_y,
+            # 'final_bbox_list': final_bbox_list,
+            # 'final_id_list': final_id_list,
         }
 
-    def posterior_calibration(self, yaw_diff, pitch_diff, distance):
+    def posterior_calibration(self, raw_pitch, raw_yaw, target_y_dist, target_z_dist):
         """Given a set of naively estimated parameters, return calibrated parameters.
 
         Idea:
@@ -90,43 +143,9 @@ class Aim:
         Returns:
             (float, float): calibrated yaw_diff, pitch_diff in radians
         """
-        if distance >= 2**16:
-            # In this case, distance is a rough estimation from bbox size
-            return (yaw_diff, pitch_diff)
-        else:
-            # In this case, distance comes from D455 stereo estimation
-            # TODO: compute a range table
-            return (yaw_diff, pitch_diff)
-
-    def get_closet_pred(self, bbox_list, rgb_img):
-        """Get the closet prediction to camera focal point.
-
-        Args:
-            bbox_list (list): a list of bounding boxes
-            rgb_img (np.ndarray): RGB image
-
-        Returns:
-            (bbox_list, float): closet_pred, closet_dist
-        """
-        # TODO: instead of camera focal point; calibrate closet pred to
-        # operator view
-        H, W, C = rgb_img.shape
-        focal_y = H / 2
-        focal_x = W / 2
-        closet_pred = None
-        closet_dist = None  # Cloest to camera in z-axis
-        closet_dist = 99999999
-        for bbox in bbox_list:
-            center_x, center_y, width, height = bbox
-            cur_dist = (center_x - focal_x)**2 + (center_y - focal_y)**2
-            if closet_pred is None:
-                closet_pred = bbox
-                closet_dist = cur_dist
-            else:
-                if cur_dist < closet_dist:
-                    closet_pred = bbox
-                    closet_dist = cur_dist
-        return closet_pred, closet_dist
+        # In this case, distance comes from D455 stereo estimation
+        # TODO: compute a range table
+        return (raw_pitch, raw_yaw)
 
     def get_rotation_angle(self, bbox_center_x, bbox_center_y):
         """Given a bounding box center, return the yaw/pitch difference in radians.
