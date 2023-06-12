@@ -116,6 +116,7 @@ def get_intrinsic_matrix(cfg):
 
         return K
 
+
 def get_radian_diff(angle1, angle2):
     """Compute the abs difference between two angles in radians.
 

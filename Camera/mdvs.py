@@ -105,8 +105,7 @@ class mdvs_camera(CameraBase):
         # Grab one frame from camera
         try:
             pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.cam, 200)
-            mvsdk.CameraImageProcess(
-                self.cam, pRawData, self.frame_buffer, FrameHead)
+            mvsdk.CameraImageProcess(self.cam, pRawData, self.frame_buffer, FrameHead)
             mvsdk.CameraReleaseImageBuffer(self.cam, pRawData)
 
             # At this point the frame is stored in pFrameBuffer.
@@ -124,16 +123,13 @@ class mdvs_camera(CameraBase):
                  FrameHead.iWidth,
                  1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
-            frame = cv2.resize(
-                frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
             if self.cfg.ROTATE_180:
                 frame = cv2.rotate(frame, cv2.ROTATE_180)
             return frame
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
-                print(
-                    "CameraGetImageBuffer failed({}): {}".format(
-                        e.error_code, e.message))
+                print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
     def __del__(self):
         """Clean up MDVS driver connection and buffer."""
