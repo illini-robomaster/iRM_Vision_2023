@@ -48,6 +48,7 @@ class pnp_estimator:
                                           distCoeffs=None)
 
         # rot_mat, _ = cv2.Rodrigues(rvec)
-        # abs_dist = np.sqrt(np.sum(tvec**2))
+        abs_dist = np.sqrt(np.sum(tvec**2))
 
-        return -tvec[1], tvec[2]
+        # return -tvec[1], tvec[2]
+        return 0, abs_dist / 1000.0

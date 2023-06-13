@@ -1,6 +1,7 @@
 """Hosts the Aim class, which is the main class for auto-aiming."""
 from .Tracking import basic_tracker
 from .DistEst import pnp_estimator
+from .TrajModel import *
 import numpy as np
 import Utils
 
@@ -143,9 +144,14 @@ class Aim:
         Returns:
             (float, float): calibrated yaw_diff, pitch_diff in radians
         """
-        # In this case, distance comes from D455 stereo estimation
-        # TODO: compute a range table
-        return (raw_pitch, raw_yaw)
+        target_pitch = raw_pitch
+        target_yaw = raw_yaw
+
+        # Gravity calibration
+        pitch_diff = calibrate_pitch_gravity(target_z_dist, target_y_dist)
+        target_pitch -= pitch_diff
+
+        return (target_pitch, target_yaw)
 
     def get_rotation_angle(self, bbox_center_x, bbox_center_y):
         """Given a bounding box center, return the yaw/pitch difference in radians.
