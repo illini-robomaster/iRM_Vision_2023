@@ -2,6 +2,7 @@
 import numpy as np
 import numdifftools
 
+
 def calibrate_pitch_gravity(cfg, x1, y1):
     """Calibrate pitch offset to account for gravity and air resistance.
 
