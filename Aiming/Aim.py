@@ -148,7 +148,7 @@ class Aim:
         target_yaw = raw_yaw
 
         # Gravity calibration
-        pitch_diff = calibrate_pitch_gravity(target_z_dist, target_y_dist)
+        pitch_diff = calibrate_pitch_gravity(self.CFG, target_z_dist, target_y_dist)
         target_pitch -= pitch_diff
 
         return (target_pitch, target_yaw)
