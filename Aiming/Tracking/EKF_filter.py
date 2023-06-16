@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class ExtendedKalmanFilter:
     def __init__(self, f, h, jacobian_f, jacobian_h, update_Q, update_R, P0):
         # f: 状态转移函数
@@ -22,7 +23,7 @@ class ExtendedKalmanFilter:
         self.I = np.eye(self.n)
         # x_post: 后验状态，表示经过更新步骤后的状态估计值
         self.x_post = np.zeros(self.n)
-    
+
     def set_state(self, x0):
         # 设置初始状态
         self.x_post = x0
@@ -46,7 +47,8 @@ class ExtendedKalmanFilter:
         self.H = self.jacobian_h(self.x_pri)
         self.R = self.update_R(z)
 
-        self.K = self.P_pri @ self.H.T @ np.linalg.inv(self.H @ self.P_pri @ self.H.T + self.R)  # 计算卡尔曼增益
+        # 计算卡尔曼增益
+        self.K = self.P_pri @ self.H.T @ np.linalg.inv(self.H @ self.P_pri @ self.H.T + self.R)
         self.x_post = self.x_pri + self.K @ (z - self.h(self.x_pri))  # 用观测数据更新状态预测
         self.P_post = (self.I - self.K @ self.H) @ self.P_pri  # 更新后验误差协方差矩阵
 
