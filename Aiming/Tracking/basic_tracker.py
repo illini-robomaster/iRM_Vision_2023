@@ -5,90 +5,10 @@ import numpy as np
 from .consistent_id_gen import ConsistentIdGenerator
 
 # TODO: this class should be part of abstract base tracker class
-from .EKF_tracker import tracked_armor
+from .armor_tracker import tracked_armor
 
 # TODO: move this to config
 FRAME_BUFFER_SIZE = 10
-
-# class tracked_armor(object):
-#     """A class that represents a tracked armor.
-
-#     It stores the history of bounding boxes and ROIs, and can predict the
-#     bounding box of the next frame.
-#     """
-
-#     def __init__(self, bbox, roi, frame_tick, armor_id):
-#         """Initialize from prediction.
-
-#         Args:
-#             bbox (tuple): (center_x, center_y, w, h)
-#             roi (np.ndarray): ROI of the armor
-#             frame_tick (int): frame tick
-#             armor_id (int): unique ID
-#         """
-#         self.bbox_buffer = [bbox]
-#         self.roi_buffer = [roi]
-#         self.observed_frame_tick = [frame_tick]
-#         self.armor_id = armor_id  # unique ID
-
-#     def compute_cost(self, other_armor):
-#         """Compute the cost of matching this armor with another armor.
-
-#         Args:
-#             other_armor (tracked_armor): another armor
-
-#         Returns:
-#             float: cost
-#         """
-#         assert isinstance(other_armor, tracked_armor)
-#         # TODO: use more sophisticated metrics (e.g., RGB) as cost function
-#         c_x, c_y, w, h = self.bbox_buffer[-1]
-#         o_c_x, o_c_y, o_w, o_h = other_armor.bbox_buffer[-1]
-#         return np.square(c_x - o_c_x) + np.square(c_y - o_c_y)
-
-#     def update(self, other_armor, frame_tick):
-#         """Update the state of this armor with matched armor.
-
-#         Args:
-#             other_armor (tracked_armor): another armor
-#             frame_tick (int): frame tick
-#         """
-#         # Only call if these two armors are matched
-#         self.bbox_buffer.append(other_armor.bbox_buffer[-1])
-#         self.roi_buffer.append(other_armor.roi_buffer[-1])
-#         self.observed_frame_tick.append(frame_tick)
-
-#         # Maintain each armor's buffer so that anything older than
-#         # FRAME_BUFFER_SIZE is dropped
-#         self.bbox_buffer = self.bbox_buffer[-FRAME_BUFFER_SIZE:]
-#         self.roi_buffer = self.roi_buffer[-FRAME_BUFFER_SIZE:]
-
-#     def predict_bbox(self, cur_frame_tick):
-#         """Predict the bounding box of the tracked armor at cur frame tick.
-
-#         Args:
-#             cur_frame_tick (int): current frame tick
-
-#         TODO
-#             - Use Kalman filter to do prediction
-#             - Support future frame idx for predictions
-
-#         Returns:
-#             tuple: (center_x, center_y, w, h)
-#         """
-#         if cur_frame_tick == self.observed_frame_tick[-1] or len(
-#                 self.bbox_buffer) == 1:
-#             return self.bbox_buffer[-1]
-#         else:
-#             # Linear extrapolation
-#             c_x, c_y, w, h = self.bbox_buffer[-1]
-#             o_c_x, o_c_y, o_w, o_h = self.bbox_buffer[-2]
-#             delta_tick = self.observed_frame_tick[-1] - \
-#                 self.observed_frame_tick[-2]
-#             new_delta_tick = cur_frame_tick - self.observed_frame_tick[-1]
-#             delta_x = (c_x - o_c_x) * new_delta_tick / delta_tick
-#             delta_y = (c_y - o_c_y) * new_delta_tick / delta_tick
-#             return (int(c_x + delta_x), int(c_y + delta_y), w, h)
 
 
 class basic_tracker(object):
@@ -98,7 +18,7 @@ class basic_tracker(object):
     It memorizes the state of last two predictions and do linear extrapolation
     """
 
-    SE_THRESHOLD = 3200  # (40, 40) pixels away
+    SE_THRESHOLD = 0.1
 
     def __init__(self, config):
         """Initialize the simple lineartracker.
@@ -123,15 +43,8 @@ class basic_tracker(object):
             (list, list): list of tracked_armors (detections+predictions) and their IDs
         """
         new_armors = []
-        for armor_type, abs_yaw, abs_pitch, y_distance, z_distance in pred_list:
-            new_armors.append(
-                tracked_armor(
-                    armor_type,
-                    abs_yaw,
-                    abs_pitch,
-                    y_distance,
-                    z_distance,
-                    self.frame_tick))
+        for armor_type, armor_xyz, armor_yaw in pred_list:
+            new_armors.append(tracked_armor(armor_type, armor_xyz, armor_yaw, self.frame_tick))
 
         if len(self.active_armors) > 0:
             # Try to associate with current armors

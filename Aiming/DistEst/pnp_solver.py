@@ -2,6 +2,7 @@
 import numpy as np
 import cv2
 import Utils
+from scipy.spatial.transform import Rotation as R
 
 
 class pnp_estimator:
@@ -25,7 +26,7 @@ class pnp_estimator:
             [65, 125 / 4, 0]
         ]).reshape((4, 3, 1))
 
-    def estimate_distance(self, armor, img_rgb):
+    def estimate_position(self, armor, img_rgb):
         """Estimate the distance to the armor.
 
         Args:
@@ -45,10 +46,13 @@ class pnp_estimator:
         retval, rvec, tvec = cv2.solvePnP(self.armor_3d_pts.astype(float),
                                           obj_2d_pts.astype(float),
                                           self.K,
-                                          distCoeffs=None)
+                                          distCoeffs=None,
+                                          flags=cv2.SOLVEPNP_IPPE)
 
-        # rot_mat, _ = cv2.Rodrigues(rvec)
-        abs_dist = np.sqrt(np.sum(tvec**2))
+        rot_mat, _ = cv2.Rodrigues(rvec)
 
-        # return -tvec[1], tvec[2]
-        return 0, abs_dist / 1000.0
+        r = R.from_matrix(rot_mat)
+        # enemy armor angle w.r.t. enemy robot center
+        _, _, armor_yaw = r.as_euler('xyz', degrees=False)
+
+        return tvec / 1000.0, armor_yaw

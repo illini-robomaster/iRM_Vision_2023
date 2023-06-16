@@ -3,6 +3,7 @@ from .Tracking import basic_tracker
 from .DistEst import pnp_estimator
 from .TrajModel import *
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 import Utils
 
 from IPython import embed
@@ -43,17 +44,28 @@ class Aim:
         gimbal_yaw = stm32_state_dict['cur_yaw']
         gimbal_pitch = stm32_state_dict['cur_pitch']
 
+        # TODO(roger): compute actual transformation
+        camera_barrel_T = np.eye(4)
+
+        r = R.from_euler('zyx', [0, gimbal_yaw, gimbal_pitch], degrees=False)
+        gimbal_T = np.eye(4)
+        gimbal_T[:3, :3] = r.as_matrix()
+
         ret_list = []
 
         for pred in pred_list:
             armor_name, conf, armor_type, bbox, armor = pred
-            c_x, c_y, w, h = bbox
-            rel_yaw, rel_pitch = self.get_rotation_angle(c_x, c_y)
-            abs_yaw = gimbal_yaw + rel_yaw
-            abs_pitch = gimbal_pitch + rel_pitch
-            y_distance, z_distance = self.distance_estimator.estimate_distance(armor, rgb_img)
+            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor, rgb_img)
 
-            ret_list.append((armor_type, abs_yaw, abs_pitch, y_distance, z_distance))
+            tmp_armor_pose = np.eye(4)
+            tmp_armor_pose[:3, 3:] = armor_xyz
+
+            # Use barrel front as the origin
+            tmp_armor_pose = camera_barrel_T @ tmp_armor_pose
+            # Use gimbal and initialized yaw as the origin
+            tmp_armor_pose = gimbal_T @ tmp_armor_pose
+
+            ret_list.append((armor_type, tmp_armor_pose[:3, 3], armor_yaw))
 
         return ret_list
 
@@ -72,22 +84,20 @@ class Aim:
 
         target_pitch = None
         target_yaw = None
-        target_y_dist = None
-        target_z_dist = None
+        target_dist = None
         min_angle_diff = 9999
 
-        for y_dist, z_dist, predicted_pitch, predicted_yaw in distance_angle_list:
+        for dist, predicted_pitch, predicted_yaw in distance_angle_list:
             pitch_diff = Utils.get_radian_diff(predicted_pitch, gimbal_pitch)
             yaw_diff = Utils.get_radian_diff(predicted_yaw, gimbal_yaw)
             angle_diff = pitch_diff + yaw_diff
             if angle_diff < min_angle_diff:
                 target_pitch = predicted_pitch
                 target_yaw = predicted_yaw
-                target_y_dist = y_dist
-                target_z_dist = z_dist
+                target_dist = dist
                 min_angle_diff = angle_diff
 
-        return target_pitch, target_yaw, target_y_dist, target_z_dist
+        return target_pitch, target_yaw, target_dist
 
     def process_one(self, pred_list, enemy_team, rgb_img, stm32_state_dict):
         """Process one frame of predictions.
@@ -114,10 +124,10 @@ class Aim:
         if target_dist_angle_tuple[0] is None:
             return None
 
-        target_pitch, target_yaw, target_y_dist, target_z_dist = target_dist_angle_tuple
+        target_pitch, target_yaw, target_dist = target_dist_angle_tuple
 
         calibrated_pitch, calibrated_yaw = self.posterior_calibration(
-            target_pitch, target_yaw, target_y_dist, target_z_dist)
+            target_pitch, target_yaw, target_dist)
 
         return {
             # 'yaw_diff': calibrated_yaw_diff,
@@ -130,7 +140,7 @@ class Aim:
             # 'final_id_list': final_id_list,
         }
 
-    def posterior_calibration(self, raw_pitch, raw_yaw, target_y_dist, target_z_dist):
+    def posterior_calibration(self, raw_pitch, raw_yaw, target_dist):
         """Given a set of naively estimated parameters, return calibrated parameters.
 
         Idea:
@@ -148,27 +158,27 @@ class Aim:
         target_yaw = raw_yaw
 
         # Gravity calibration
-        pitch_diff = calibrate_pitch_gravity(self.CFG, target_z_dist, target_y_dist)
+        pitch_diff = calibrate_pitch_gravity(self.CFG, target_dist)
         target_pitch -= pitch_diff
 
         return (target_pitch, target_yaw)
 
-    def get_rotation_angle(self, bbox_center_x, bbox_center_y):
-        """Given a bounding box center, return the yaw/pitch difference in radians.
+    # def get_rotation_angle(self, bbox_center_x, bbox_center_y):
+    #     """Given a bounding box center, return the yaw/pitch difference in radians.
 
-        Args:
-            bbox_center_x (float): x coordinate of the center of the bounding box
-            bbox_center_y (float): y coordinate of the center of the bounding box
+    #     Args:
+    #         bbox_center_x (float): x coordinate of the center of the bounding box
+    #         bbox_center_y (float): y coordinate of the center of the bounding box
 
-        Returns:
-            (float, float): yaw_diff, pitch_diff in radians
-        """
-        yaw_diff = (bbox_center_x - self.CFG.IMG_CENTER_X) * \
-            (self.CFG.AUTOAIM_CAMERA.YAW_FOV_HALF / self.CFG.IMG_CENTER_X)
-        pitch_diff = (bbox_center_y - self.CFG.IMG_CENTER_Y) * \
-            (self.CFG.AUTOAIM_CAMERA.PITCH_FOV_HALF / self.CFG.IMG_CENTER_Y)
+    #     Returns:
+    #         (float, float): yaw_diff, pitch_diff in radians
+    #     """
+    #     yaw_diff = (bbox_center_x - self.CFG.IMG_CENTER_X) * \
+    #         (self.CFG.AUTOAIM_CAMERA.YAW_FOV_HALF / self.CFG.IMG_CENTER_X)
+    #     pitch_diff = (bbox_center_y - self.CFG.IMG_CENTER_Y) * \
+    #         (self.CFG.AUTOAIM_CAMERA.PITCH_FOV_HALF / self.CFG.IMG_CENTER_Y)
 
-        yaw_diff = -yaw_diff  # counter-clockwise is positive
-        pitch_diff = pitch_diff  # down is positive
+    #     yaw_diff = -yaw_diff  # counter-clockwise is positive
+    #     pitch_diff = pitch_diff  # down is positive
 
-        return yaw_diff, pitch_diff
+    #     return yaw_diff, pitch_diff
