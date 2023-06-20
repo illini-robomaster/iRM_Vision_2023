@@ -87,7 +87,11 @@ class UARTCommunicator:
         if self.serial_port is not None:
             if (self.serial_port.inWaiting() > 0):
                 # read the bytes and convert from binary array to ASCII
-                byte_array = self.serial_port.read(self.serial_port.inWaiting())
+                try:
+                    byte_array = self.serial_port.read(self.serial_port.inWaiting())
+                except serial.serialutil.SerialException:
+                    print("No data returned?")
+                    return False
 
                 for c in byte_array:
                     if len(self.circular_buffer) >= self.buffer_size:
