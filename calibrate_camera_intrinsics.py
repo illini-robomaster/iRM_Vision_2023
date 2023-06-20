@@ -1,6 +1,9 @@
 """Utility to calibrate camera intrinsics."""
 
+import sys
+print(sys.path)
 import numpy as np
+import config
 import cv2
 
 
@@ -77,20 +80,14 @@ def estimate_intrinsics(checkerboard_img_list):
 # https://raw.githubusercontent.com/opencv/opencv/4.x/doc/pattern.png
 
 
-def main(camera_idx):
+def main():
     """Compute intrinsics from a live camera."""
-    cap = cv2.VideoCapture(camera_idx)
-    if not cap.isOpened():
-        print("Cannot open camera")
-        exit()
+    autoaim_camera = config.AUTOAIM_CAMERA(config)
 
     checkerboard_img_list = []
 
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Stream end. Exiting ...")
-            break
+        frame = autoaim_camera.get_frame()
         cv2.imshow('frame', frame)
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
@@ -98,7 +95,6 @@ def main(camera_idx):
         elif key == ord('s'):
             checkerboard_img_list.append(frame)
 
-    cap.release()
     cv2.destroyAllWindows()
 
     intrinsics = estimate_intrinsics(checkerboard_img_list)
@@ -106,4 +102,4 @@ def main(camera_idx):
 
 
 if __name__ == '__main__':
-    main(0)
+    main()
