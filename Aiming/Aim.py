@@ -130,14 +130,9 @@ class Aim:
             target_pitch, target_yaw, target_dist)
 
         return {
-            # 'yaw_diff': calibrated_yaw_diff,
-            # 'pitch_diff': calibrated_pitch_diff,
             'abs_yaw': calibrated_yaw,
             'abs_pitch': calibrated_pitch,
-            # 'center_x': center_x,
-            # 'center_y': center_y,
-            # 'final_bbox_list': final_bbox_list,
-            # 'final_id_list': final_id_list,
+            'target_dist': target_dist,
         }
 
     def posterior_calibration(self, raw_pitch, raw_yaw, target_dist):

@@ -3,7 +3,7 @@ import numpy as np
 import numdifftools
 
 
-def calibrate_pitch_gravity(cfg, x1, y1):
+def calibrate_pitch_gravity(cfg, target_dist):
     """Calibrate pitch offset to account for gravity and air resistance.
 
     Args:
@@ -14,6 +14,8 @@ def calibrate_pitch_gravity(cfg, x1, y1):
     Returns:
         pitch_offset (float): how much to offset pitch angle
     """
+    y1 = 0
+    x1 = target_dist
     g = cfg.GRAVITY_CONSTANT
     v = cfg.INITIAL_BULLET_SPEED
     # define the function
