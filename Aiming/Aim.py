@@ -42,11 +42,7 @@ class Aim:
         gimbal_yaw = stm32_state_dict['cur_yaw']
         gimbal_pitch = stm32_state_dict['cur_pitch']
 
-        # TODO(roger): support only steering robot now
-        x_offset = 0.1
-        y_offset = 0.05
-        z_offset = 0.085
-        camera_barrel_T = np.eye(4)
+        camera_barrel_T = get_camera_barrel_T(self.CFG)
 
         # TODO(roger): set a constant and test transform sign
         gimbal_yaw = 0
