@@ -1,8 +1,28 @@
+"""Module hosting EKF for RM robot with generic interfaces."""
 import numpy as np
 
-
 class ExtendedKalmanFilter:
+    """EKF tailored for RM robot center and armor tracking.
+
+    Track states (9 dimensisons):
+        - target_state[0]: x_center, x coordinate of robot center
+        - target_state[1]: v_x_center, x velocity of robot center
+        - target_state[2]: y_center, y coordinate of robot center
+        - target_state[3]: v_y_center, y velocity of robot center
+        - target_state[4]: z_armor, z coordinate of armor (rough robot height)
+        - target_state[5]: v_z_armor, z velocity of armor (rough robot height)
+        - target_state[6]: yaw, yaw angle of robot
+        - target_state[7]: v_yaw, yaw velocity of robot
+        - target_state[8]: r, radius of robot
+    
+    Variable names explanations:
+        # xa = x_armor, xc = x_robot_center
+        # state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r
+        # measurement: xa, ya, za, yaw
+    """
+
     def __init__(self):
+        """Initialize the EKF filter. Assume 9 states."""
         P0 = np.eye(9)
         # Posteriori error covariance matrix, indicating the uncertainty of state estimation
         self.P_post = P0
@@ -12,6 +32,14 @@ class ExtendedKalmanFilter:
         self.x_post = np.zeros(self.n)
 
     def update_R(self, z):
+        """Update measurement noise covariance matrix.
+
+        Args:
+            z (np.array): measurement
+
+        Returns:
+            R: measurement noise covariance matrix
+        """
         r_xyz_factor = 4e-4
         r_yaw = 5e-3
         r = np.zeros((4, 4))
@@ -23,9 +51,17 @@ class ExtendedKalmanFilter:
         return r
 
     def update_Q(self, dt):
-        # Update process noise covariance matrix
-        # Parameters can be found here:
-        # https://gitlab.com/rm_vision/rm_vision/-/blob/main/rm_vision_bringup/config/node_params.yaml
+        """Update process noise covariance matrix.
+
+        First version of parameters can be found here:
+            https://gitlab.com/rm_vision/rm_vision/-/blob/main/rm_vision_bringup/config/node_params.yaml
+
+        Args:
+            dt (float): time interval between two observations
+
+        Returns:
+            Q: process noise covariance matrix
+        """
         s2qxyz = 0.05
         x = s2qxyz
         s2qyaw = 5.0
@@ -55,7 +91,15 @@ class ExtendedKalmanFilter:
         return q_mat
 
     def get_jacobian_f(self, x, dt):
-        # Jacobian of state transition function
+        """Get Jacobian of state transition function.
+
+        Args:
+            x (np.array): state vector (not used in this function)
+            dt (float): time interval between two observations
+
+        Returns:
+            np.ndarray: Jacobian of state transition function
+        """
         jacobian_f = np.eye(self.n)
         jacobian_f[0, 1] = dt
         jacobian_f[2, 3] = dt
@@ -64,7 +108,15 @@ class ExtendedKalmanFilter:
         return jacobian_f
 
     def get_jacobian_h(self, x, dt):
-        # Jacobian of observation function
+        """Get Jacobian of observation function.
+
+        Args:
+            x (np.array): state vector
+            dt (float): time interval between two observations
+
+        Returns:
+            np.ndarray: Jacobian of observation function
+        """
         jacobian_h = np.zeros((4, 9))
         yaw = x[6]
         r = x[8]
@@ -79,12 +131,15 @@ class ExtendedKalmanFilter:
         return jacobian_h
 
     def f(self, state, dt):
-        # EKF
-        # xa = x_armor, xc = x_robot_center
-        # state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r
-        # measurement: xa, ya, za, yaw
-        # dt: current observation time - previous observation time
-        # f - Process function
+        """State transition function.
+        
+        Args:
+            state (np.array): state vector
+            dt (float): time interval between two observations
+            
+        Returns:
+            np.array: state vector after transition
+        """
         state_new = state.copy()
         assert len(state) == 9
         state_new[0] += state[1] * dt
@@ -94,7 +149,14 @@ class ExtendedKalmanFilter:
         return state_new
 
     def h(self, state):
-        # observation function
+        """Observation function.
+
+        Args:
+            state (np.array): state vector
+
+        Returns:
+            np.array: observation vector
+        """
         z = np.zeros(4)
         xc = state[0]
         yc = state[2]
@@ -107,11 +169,22 @@ class ExtendedKalmanFilter:
         return z
 
     def set_state(self, x0):
-        # Overwrite the initial state
+        """Overwrite current state.
+        
+        Args:
+            x0 (np.array): new state vector
+        """
         self.x_post = x0
 
     def predict(self, dt):
-        # Predict next state
+        """Predict next state.
+
+        Args:
+            dt (float): time interval between two observations
+
+        Returns:
+            np.array: predicted state vector
+        """
         self.F = self.get_jacobian_f(self.x_post, dt)
         self.Q = self.update_Q(dt)
 
@@ -127,7 +200,15 @@ class ExtendedKalmanFilter:
         return self.x_pri
 
     def update(self, z, dt):
-        # Update state using observation
+        """Update state using observation.
+        
+        Args:
+            z (np.array): observation vector
+            dt (float): time interval between two observations
+            
+        Returns:
+            np.array: updated state vector
+        """
         self.H = self.get_jacobian_h(self.x_pri, dt)
         self.R = self.update_R(z)
 
