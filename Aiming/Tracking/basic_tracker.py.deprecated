@@ -8,7 +8,7 @@ from .consistent_id_gen import ConsistentIdGenerator
 from .armor_tracker import tracked_armor
 
 # TODO: move this to config
-FRAME_BUFFER_SIZE = 10
+FRAME_BUFFER_SIZE = 1
 
 
 class basic_tracker(object):

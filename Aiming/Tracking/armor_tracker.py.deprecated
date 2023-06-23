@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as R
 import Utils
 
 # TODO: move this to config
-FRAME_BUFFER_SIZE = 10
+FRAME_BUFFER_SIZE = 1
 
 
 class tracked_armor(object):
@@ -82,5 +82,7 @@ class tracked_armor(object):
 
         gimbal_pitch = np.arctan2(xyz_pos[1], xyz_pos[2])
         gimbal_yaw = -np.arctan2(xyz_pos[0], xyz_pos[2])
+
+        print(xyz_pos)
 
         return dist, gimbal_pitch, gimbal_yaw
