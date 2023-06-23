@@ -8,11 +8,9 @@ class ExtendedKalmanFilter:
         self.P_post = P0
         # n: dimension of state vector
         self.n = P0.shape[0]
-        # I: identity matrix for convenience
-        self.I = np.eye(self.n)
         # Posteriori state, indicating the state estimation after the update step
         self.x_post = np.zeros(self.n)
-    
+
     def update_R(self, z):
         r_xyz_factor = 4e-4
         r_yaw = 5e-3
@@ -23,7 +21,7 @@ class ExtendedKalmanFilter:
         r[2, 2] = np.abs(x * z[2])
         r[3, 3] = r_yaw
         return r
-    
+
     def update_Q(self, dt):
         # Update process noise covariance matrix
         # Parameters can be found here:
@@ -55,7 +53,7 @@ class ExtendedKalmanFilter:
             [0, 0, 0, 0, 0, 0, 0, 0, q_r]
         ])
         return q_mat
-    
+
     def get_jacobian_f(self, x, dt):
         # Jacobian of state transition function
         jacobian_f = np.eye(self.n)
@@ -79,7 +77,7 @@ class ExtendedKalmanFilter:
         jacobian_h[2, 4] = 1
         jacobian_h[3, 6] = 1
         return jacobian_h
-    
+
     def f(self, state, dt):
         # EKF
         # xa = x_armor, xc = x_robot_center
@@ -118,9 +116,9 @@ class ExtendedKalmanFilter:
         self.Q = self.update_Q(dt)
 
         # Priori state estimate using state transition function
-        self.x_pri = self.f(self.x_post, dt) 
+        self.x_pri = self.f(self.x_post, dt)
         # Update priori error covariance matrix
-        self.P_pri = self.F @ self.P_post @ self.F.T + self.Q 
+        self.P_pri = self.F @ self.P_post @ self.F.T + self.Q
 
         # Update posteriori state and error covariance matrix for next iteration
         self.x_post = self.x_pri
@@ -137,9 +135,9 @@ class ExtendedKalmanFilter:
         self.K = self.P_pri @ self.H.T @ np.linalg.inv(self.H @ self.P_pri @ self.H.T + self.R)
 
         # Posteriori state estimate using observed data
-        self.x_post = self.x_pri + self.K @ (z - self.h(self.x_pri)) 
+        self.x_post = self.x_pri + self.K @ (z - self.h(self.x_pri))
 
         # Update posteriori error covariance matrix
-        self.P_post = (self.I - self.K @ self.H) @ self.P_pri
+        self.P_post = (np.eye(self.n) - self.K @ self.H) @ self.P_pri
 
         return self.x_post

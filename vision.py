@@ -83,27 +83,27 @@ def main():
                 target_x = -yaw_diff / (config.AUTOAIM_CAMERA.YAW_FOV_HALF /
                                         config.IMG_CENTER_X) + config.IMG_CENTER_X
                 target_y = pitch_diff / (config.AUTOAIM_CAMERA.PITCH_FOV_HALF /
-                                        config.IMG_CENTER_Y) + config.IMG_CENTER_Y
+                                         config.IMG_CENTER_Y) + config.IMG_CENTER_Y
                 show_frame = cv2.circle(show_frame,
                                         (int(target_x),
-                                        int(target_y)),
+                                         int(target_y)),
                                         10, (0, 255, 0), 10)
                 yaw_diff = ret_dict['uncalibrated_yaw'] - stm32_state_dict['cur_yaw']
                 pitch_diff = ret_dict['uncalibrated_pitch'] - stm32_state_dict['cur_pitch']
                 target_x = -yaw_diff / (config.AUTOAIM_CAMERA.YAW_FOV_HALF /
                                         config.IMG_CENTER_X) + config.IMG_CENTER_X
                 target_y = pitch_diff / (config.AUTOAIM_CAMERA.PITCH_FOV_HALF /
-                                        config.IMG_CENTER_Y) + config.IMG_CENTER_Y
+                                         config.IMG_CENTER_Y) + config.IMG_CENTER_Y
                 # import pdb; pdb.set_trace()
                 show_frame = cv2.circle(show_frame,
                                         (int(target_x),
-                                        int(target_y)),
+                                         int(target_y)),
                                         10, (0, 0, 255), 10)
         else:
             # communicator.process_one_packet(config.SEARCH_TARGET, 0, 0)
             if config.DEBUG_DISPLAY:
                 show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         if config.DEBUG_PRINT:
             print('----------------\n', pred)

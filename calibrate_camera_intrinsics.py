@@ -1,10 +1,8 @@
 """Utility to calibrate camera intrinsics."""
 
-import sys
-print(sys.path)
-import numpy as np
-import config
 import cv2
+import config
+import numpy as np
 
 
 def estimate_intrinsics(checkerboard_img_list):
@@ -12,7 +10,6 @@ def estimate_intrinsics(checkerboard_img_list):
     assert len(checkerboard_img_list) > 1
     for i in range(len(checkerboard_img_list) - 1):
         assert checkerboard_img_list[i].shape == checkerboard_img_list[i + 1].shape
-    calibration_tasks = [checkerboard_img_list]  # nested list
     # Defining the dimensions of checkerboard
     # https://raw.githubusercontent.com/opencv/opencv/4.x/doc/pattern.png
     CHECKERBOARD = (6, 9)
@@ -28,53 +25,52 @@ def estimate_intrinsics(checkerboard_img_list):
     objp[0, :, :2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
 
     # Extracting path of individual image stored in a given directory
-    for image_seq in calibration_tasks:
-        for img in image_seq:
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            # Find the chess board corners
-            # If desired number of corners are found in the image then ret = true
-            ret, corners = cv2.findChessboardCorners(
-                gray,
-                CHECKERBOARD,
-                cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE
-            )
-
-            """
-            If desired number of corner are detected,
-            we refine the pixel coordinates and display
-            them on the images of checker board
-            """
-            if ret:
-                objpoints.append(objp)
-                # refining pixel coordinates for given 2d points.
-                corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-
-                imgpoints.append(corners2)
-
-                # Draw and display the corners
-                img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
-
-            cv2.imshow('img', img)
-            cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    for img in checkerboard_img_list:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # Find the chess board corners
+        # If desired number of corners are found in the image then ret = true
+        ret, corners = cv2.findChessboardCorners(
+            gray,
+            CHECKERBOARD,
+            cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE
+        )
 
         """
-        Performing camera calibration by
-        passing the value of known 3D points (objpoints)
-        and corresponding pixel coordinates of the
-        detected corners (imgpoints)
+        If desired number of corner are detected,
+        we refine the pixel coordinates and display
+        them on the images of checker board
         """
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-            objpoints, imgpoints, gray.shape[::-1], None, None)
+        if ret:
+            objpoints.append(objp)
+            # refining pixel coordinates for given 2d points.
+            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
 
-        print("Camera matrix : \n")
-        print(mtx)
-        print("dist : \n")
-        print(dist)
-        print("rvecs : \n")
-        print(rvecs)
-        print("tvecs : \n")
-        print(tvecs)
+            imgpoints.append(corners2)
+
+            # Draw and display the corners
+            img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners2, ret)
+
+        cv2.imshow('img', img)
+        cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    """
+    Performing camera calibration by
+    passing the value of known 3D points (objpoints)
+    and corresponding pixel coordinates of the
+    detected corners (imgpoints)
+    """
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+        objpoints, imgpoints, gray.shape[::-1], None, None)
+
+    print("Camera matrix : \n")
+    print(mtx)
+    print("dist : \n")
+    print(dist)
+    print("rvecs : \n")
+    print(rvecs)
+    print("tvecs : \n")
+    print(tvecs)
 
 # Print ot use a computer screen to display the following chessboard pattern
 # https://raw.githubusercontent.com/opencv/opencv/4.x/doc/pattern.png

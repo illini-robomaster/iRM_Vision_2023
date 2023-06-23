@@ -4,6 +4,7 @@ import cv2
 import Utils
 from scipy.spatial.transform import Rotation as R
 
+
 class pnp_estimator:
     """Distance estimator using PnP."""
 
@@ -43,12 +44,14 @@ class pnp_estimator:
         ]).reshape((4, 2, 1))
 
         # FIXME: distinguish small and large armors
+
+        # TODO(roger): set distCoeffs for slightly better performance
         retval, rvec, tvec = cv2.solvePnP(self.small_armor_3d_pts.astype(float),
-                                            obj_2d_pts.astype(float),
-                                            self.K,
-                                            distCoeffs=None,
-                                            flags=cv2.SOLVEPNP_IPPE)
-        
+                                          obj_2d_pts.astype(float),
+                                          self.K,
+                                          distCoeffs=None,
+                                          flags=cv2.SOLVEPNP_IPPE)
+
         if not retval:
             return None, None
 

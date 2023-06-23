@@ -7,6 +7,7 @@ from .EKF_filter import ExtendedKalmanFilter
 # TODO: move this to config
 FRAME_BUFFER_SIZE = 1
 
+
 class tracker(object):
     """
     Basic tracker that can handle only one target.
@@ -41,11 +42,11 @@ class tracker(object):
         self.tracked_armors_num = 'NORMAL'
         # self.id_gen = ConsistentIdGenerator()
         # self.frame_tick = 0  # TODO: use timestamp may be a better idea
-    
+
     def update_armors_num(self):
         # FIXME: implement this to adapt to different armor boards for RMUC!
         raise NotImplementedError
-    
+
     def init_tracker_(self, pred_list):
         closet_distance = 99999999
         selected_armor_idx = -1
@@ -58,7 +59,7 @@ class tracker(object):
             if distance < closet_distance:
                 closet_distance = distance
                 selected_armor_idx = armor_idx
-        
+
         assert selected_armor_idx != -1
 
         armor_type, armor_xyz, bbox, armor_yaw = pred_list[selected_armor_idx]
@@ -69,7 +70,7 @@ class tracker(object):
 
         # FIXME
         # self.update_armors_num()
-    
+
     def update_tracker_(self, pred_list, dt):
         ekf_pred = self.ekf.predict(dt)
 
@@ -92,18 +93,20 @@ class tracker(object):
                 if position_diff < min_position_diff:
                     min_position_diff = position_diff
                     self.tracked_armor = pred_list[armor_idx]
-                    yaw_diff = np.abs(self.orientation_to_yaw(armor_yaw) - ekf_pred[6]) % (2 * np.pi)
-            
+                    yaw_diff = np.abs(self.orientation_to_yaw(
+                        armor_yaw) - ekf_pred[6]) % (2 * np.pi)
+
             if min_position_diff < self.max_match_distance_ and yaw_diff < self.max_match_yaw_diff_:
                 matched = True
                 # Update EKF
                 measured_yaw = self.orientation_to_yaw(self.tracked_armor[3])
                 mesuared_xyz = self.tracked_armor[1]
-                self.measurement = np.array([mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
+                self.measurement = np.array(
+                    [mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
                 self.target_state = self.ekf.update(self.measurement, dt)
             elif same_id_armors_count == 1 and yaw_diff > self.max_match_yaw_diff_:
                 self.handle_armor_jump_(same_id_armor)
-        
+
         # Ad-hoc post processing
         if self.target_state[8] < 0.12:
             self.target_state[8] = 0.12
@@ -111,7 +114,7 @@ class tracker(object):
         elif self.target_state[8] > 0.4:
             self.target_state[8] = 0.4
             self.ekf.set_state(self.target_state)
-        
+
         # Tracking FSM
         if self.tracked_state == 'DETECTING':
             if matched:
@@ -137,7 +140,7 @@ class tracker(object):
             else:
                 self.tracked_state = 'TRACKING'
                 self.lost_count_ = 0
-    
+
     def handle_armor_jump_(self, same_id_armor):
         # reset EKF state for new armor
         armor_type, armor_xyz, bbox, armor_yaw = same_id_armor
@@ -150,7 +153,7 @@ class tracker(object):
             dz = self.target_state[4] - armor_xyz[2]
             self.target_state[4] = armor_xyz[2]
             self.another_r, self.target_state[8] = self.target_state[8], self.another_r
-        
+
         infer_p = self.get_armor_position_from_state(self.target_state)
         if np.linalg.norm(infer_p - armor_xyz) > self.max_match_distance_:
             r = self.target_state[8]
@@ -160,9 +163,9 @@ class tracker(object):
             self.target_state[3] = 0
             self.target_state[4] = armor_xyz[2]
             self.target_state[5] = 0
-        
+
         self.ekf.set_state(self.target_state)
-    
+
     def orientation_to_yaw(self, yaw):
         # shortest distance to last_yaw_
         yaw_diff = yaw - self.last_yaw_
@@ -184,7 +187,7 @@ class tracker(object):
         xa = xc - r * np.cos(yaw)
         ya = yc - r * np.sin(yaw)
         return np.array([xa, ya, za])
-    
+
     def init_EKF(self, pred_list, selected_armor_idx):
         armor_type, armor_xyz, bbox, armor_yaw = pred_list[selected_armor_idx]
         xa = armor_xyz[0]
@@ -208,7 +211,7 @@ class tracker(object):
         self.target_state[8] = r
 
         self.ekf.set_state(self.target_state)
-    
+
     def process_one(self, pred_list, stm32_state_dict):
         if self.tracked_state == 'LOST':
             self.init_tracker_(pred_list)
@@ -224,6 +227,7 @@ class tracker(object):
                 # X: from barrel rear to front
                 # Y: from barrel left to right
                 # Z: up is gravity direction
+                print(self.target_state[6])
                 armor_pos = self.get_armor_position_from_state(ret)
                 dist = np.sqrt(armor_pos[0]**2 + armor_pos[2]**2)
 

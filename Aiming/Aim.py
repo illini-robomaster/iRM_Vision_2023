@@ -6,6 +6,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 import Utils
 
+
 class Aim:
     """
     The main class for auto-aiming.
@@ -41,7 +42,10 @@ class Aim:
         gimbal_yaw = stm32_state_dict['cur_yaw']
         gimbal_pitch = stm32_state_dict['cur_pitch']
 
-        # TODO(roger): compute actual transformation from CAD model
+        # TODO(roger): support only steering robot now
+        x_offset = 0.1
+        y_offset = 0.05
+        z_offset = 0.085
         camera_barrel_T = np.eye(4)
 
         # TODO(roger): set a constant and test transform sign

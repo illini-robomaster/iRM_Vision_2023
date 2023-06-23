@@ -7,9 +7,9 @@ from Camera.read_from_file import fake_camera
 from Camera.simple_cv import simple_cv_camera
 # Define camera
 # from Camera.d455 import D455_camera
-from Camera.mdvs import mdvs_camera
-#AUTOAIM_CAMERA = fake_camera
-AUTOAIM_CAMERA = mdvs_camera
+# from Camera.mdvs import mdvs_camera
+AUTOAIM_CAMERA = fake_camera
+# AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
 EXPOSURE_TIME = 5
 
@@ -25,7 +25,7 @@ ROTATE_180 = True  # Camera is mounted upside down
 K = np.array([
     [776.10564907, 0, 314.26822299],
     [0, 775.89552525, 259.37110689],
-    [0,            0,            1],
+    [0, 0, 1],
 ])
 
 # ========== Trajectory Modeling ==========
