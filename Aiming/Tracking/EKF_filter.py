@@ -1,6 +1,7 @@
 """Module hosting EKF for RM robot with generic interfaces."""
 import numpy as np
 
+
 class ExtendedKalmanFilter:
     """EKF tailored for RM robot center and armor tracking.
 
@@ -14,7 +15,7 @@ class ExtendedKalmanFilter:
         - target_state[6]: yaw, yaw angle of robot
         - target_state[7]: v_yaw, yaw velocity of robot
         - target_state[8]: r, radius of robot
-    
+
     Variable names explanations:
         # xa = x_armor, xc = x_robot_center
         # state: xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r
@@ -132,11 +133,11 @@ class ExtendedKalmanFilter:
 
     def f(self, state, dt):
         """State transition function.
-        
+
         Args:
             state (np.array): state vector
             dt (float): time interval between two observations
-            
+
         Returns:
             np.array: state vector after transition
         """
@@ -170,7 +171,7 @@ class ExtendedKalmanFilter:
 
     def set_state(self, x0):
         """Overwrite current state.
-        
+
         Args:
             x0 (np.array): new state vector
         """
@@ -201,11 +202,11 @@ class ExtendedKalmanFilter:
 
     def update(self, z, dt):
         """Update state using observation.
-        
+
         Args:
             z (np.array): observation vector
             dt (float): time interval between two observations
-            
+
         Returns:
             np.array: updated state vector
         """

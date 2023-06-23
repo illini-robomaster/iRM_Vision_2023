@@ -4,6 +4,7 @@ import numpy as np
 from .consistent_id_gen import ConsistentIdGenerator
 from .EKF_filter import ExtendedKalmanFilter
 
+
 class tracker:
     """
     EKF tracker that selects a single robot and tracks it (can't handle multiple robots).
@@ -13,7 +14,7 @@ class tracker:
         - TRACKING: the tracker is tracking a robot
         - TEMP_LOST: the tracker lost the robot for a short time
         - LOST: the tracker lost the robot for a long time
-    
+
     TODO(roger): write more about the tracker
     """
 
@@ -231,7 +232,7 @@ class tracker:
         """Initialize the EKF filter.
 
         Internal function. DO NOT call this function directly.
-        
+
         Args:
             pred_list (list): a list of recognized armors
             selected_armor_idx (int): the index of the selected armor in the list
@@ -284,7 +285,6 @@ class tracker:
                 # X: from barrel rear to front
                 # Y: from barrel left to right
                 # Z: up is gravity direction
-                print(self.target_state[6])
                 armor_pos = self.get_armor_position_from_state(ret)
                 dist = np.sqrt(armor_pos[0]**2 + armor_pos[2]**2)
 
