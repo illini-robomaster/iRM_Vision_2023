@@ -4,21 +4,26 @@ import numpy as np
 from .consistent_id_gen import ConsistentIdGenerator
 from .EKF_filter import ExtendedKalmanFilter
 
-# TODO: move this to config
-FRAME_BUFFER_SIZE = 1
-
-
-class tracker(object):
+class tracker:
     """
-    Basic tracker that can handle only one target.
+    EKF tracker that selects a single robot and tracks it (can't handle multiple robots).
 
-    It memorizes the state of last two predictions and do linear extrapolation
+    Tracking logic:
+        - DETECTING: the tracker is initializing
+        - TRACKING: the tracker is tracking a robot
+        - TEMP_LOST: the tracker lost the robot for a short time
+        - LOST: the tracker lost the robot for a long time
+    
+    TODO(roger): write more about the tracker
     """
 
-    SE_THRESHOLD = 0.1
+    MAX_MATCH_DISTANCE_ = 0.5
+
+    # Different from RV; fix wrapping
+    MAX_MATCH_YAW_DIFF_ = np.pi / 4  # 45 degrees
 
     def __init__(self, config):
-        """Initialize the simple lineartracker.
+        """Initialize the tracker.
 
         Args:
             config (python object): shared config
@@ -29,10 +34,7 @@ class tracker(object):
         self.tracked_state = 'LOST'
         self.measurement = np.zeros(4)
         self.target_state = np.zeros(9)
-        self.max_match_distance_ = 0.5
 
-        # Different from rm_vision with wrapping fix
-        self.max_match_yaw_diff_ = np.pi / 4  # 45 degrees
         self.last_yaw_ = 0
         self.detect_count_ = 0
         self.lost_count_ = 0
@@ -40,14 +42,24 @@ class tracker(object):
 
         # 'NORMAL', 'BALANCED', 'OUTPOST'
         self.tracked_armors_num = 'NORMAL'
-        # self.id_gen = ConsistentIdGenerator()
-        # self.frame_tick = 0  # TODO: use timestamp may be a better idea
 
     def update_armors_num(self):
+        """Update armor type to handle different numbers and sizes.
+
+        Raises:
+            NotImplementedError: TBD
+        """
         # FIXME: implement this to adapt to different armor boards for RMUC!
         raise NotImplementedError
 
     def init_tracker_(self, pred_list):
+        """Initialize the tracker.
+
+        Internal function. DO NOT call this function directly.
+
+        Args:
+            pred_list (list): a list of recognized armors
+        """
         closet_distance = 99999999
         selected_armor_idx = -1
         if len(pred_list) == 0:
@@ -72,6 +84,14 @@ class tracker(object):
         # self.update_armors_num()
 
     def update_tracker_(self, pred_list, dt):
+        """Update the tracker.
+
+        Internal function. DO NOT call this function directly.
+
+        Args:
+            pred_list (list): a list of recognized armors
+            dt (float): time interval between two observations
+        """
         ekf_pred = self.ekf.predict(dt)
 
         matched = False
@@ -96,7 +116,7 @@ class tracker(object):
                     yaw_diff = np.abs(self.orientation_to_yaw(
                         armor_yaw) - ekf_pred[6]) % (2 * np.pi)
 
-            if min_position_diff < self.max_match_distance_ and yaw_diff < self.max_match_yaw_diff_:
+            if min_position_diff < self.MAX_MATCH_DISTANCE_ and yaw_diff < self.MAX_MATCH_YAW_DIFF_:
                 matched = True
                 # Update EKF
                 measured_yaw = self.orientation_to_yaw(self.tracked_armor[3])
@@ -104,7 +124,7 @@ class tracker(object):
                 self.measurement = np.array(
                     [mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
                 self.target_state = self.ekf.update(self.measurement, dt)
-            elif same_id_armors_count == 1 and yaw_diff > self.max_match_yaw_diff_:
+            elif same_id_armors_count == 1 and yaw_diff > self.MAX_MATCH_YAW_DIFF_:
                 self.handle_armor_jump_(same_id_armor)
 
         # Ad-hoc post processing
@@ -142,7 +162,11 @@ class tracker(object):
                 self.lost_count_ = 0
 
     def handle_armor_jump_(self, same_id_armor):
-        # reset EKF state for new armor
+        """Reset the EKF state when detected a different armor of the same robot.
+
+        Args:
+            same_id_armor (armor object): another armor object of the same robot
+        """
         armor_type, armor_xyz, bbox, armor_yaw = same_id_armor
         yaw = self.orientation_to_yaw(armor_yaw)
         self.target_state[6] = yaw
@@ -155,7 +179,7 @@ class tracker(object):
             self.another_r, self.target_state[8] = self.target_state[8], self.another_r
 
         infer_p = self.get_armor_position_from_state(self.target_state)
-        if np.linalg.norm(infer_p - armor_xyz) > self.max_match_distance_:
+        if np.linalg.norm(infer_p - armor_xyz) > self.MAX_MATCH_DISTANCE_:
             r = self.target_state[8]
             self.target_state[0] = armor_xyz[0] + r * np.cos(yaw)
             self.target_state[1] = 0
@@ -167,8 +191,15 @@ class tracker(object):
         self.ekf.set_state(self.target_state)
 
     def orientation_to_yaw(self, yaw):
-        # shortest distance to last_yaw_
-        yaw_diff = yaw - self.last_yaw_
+        """Wrap input yaw angle to closet to last_yaw_ so filter does not jump.
+
+        Args:
+            yaw (float): orientation in radian
+
+        Returns:
+            float: yaw in radian closest to the last yaw
+        """
+        yaw_diff = yaw - self.last_yaw_  # shortest distance to last_yaw_
         if yaw_diff > np.pi:
             yaw_diff -= 2 * np.pi
         elif yaw_diff < -np.pi:
@@ -179,6 +210,14 @@ class tracker(object):
         return new_yaw
 
     def get_armor_position_from_state(self, x):
+        """Compute the armor position from the state.
+
+        Args:
+            x (np.array): state vector
+
+        Returns:
+            np.array: armor position in robot coordinate
+        """
         xc = x[0]
         yc = x[2]
         za = x[4]
@@ -189,6 +228,14 @@ class tracker(object):
         return np.array([xa, ya, za])
 
     def init_EKF(self, pred_list, selected_armor_idx):
+        """Initialize the EKF filter.
+
+        Internal function. DO NOT call this function directly.
+        
+        Args:
+            pred_list (list): a list of recognized armors
+            selected_armor_idx (int): the index of the selected armor in the list
+        """
         armor_type, armor_xyz, bbox, armor_yaw = pred_list[selected_armor_idx]
         xa = armor_xyz[0]
         ya = armor_xyz[1]
@@ -213,6 +260,16 @@ class tracker(object):
         self.ekf.set_state(self.target_state)
 
     def process_one(self, pred_list, stm32_state_dict):
+        """Process one frame from camera.
+
+        Args:
+            pred_list (list): a list of recognized armors
+            stm32_state_dict (dict): a dictionary of ego-robot states
+
+        Returns:
+            tuple: (dist, gimbal_pitch, gimbal_yaw) for selected robot
+                    None if no robot is selected or the tracking is lost.
+        """
         if self.tracked_state == 'LOST':
             self.init_tracker_(pred_list)
             return None
