@@ -29,12 +29,13 @@ class Aim:
         self.tracker = tracker(self.CFG)
         self.distance_estimator = pnp_estimator(self.CFG)
 
-    def preprocess(self, pred_list, stm32_state_dict, rgb_img):
+    def preprocess(self, pred_list, stm32_state_dict, raw_rgb_image):
         """Preprocess predictions to compute armor distances and absolute yaw/pitch.
 
         Args:
             pred_list (list): a list of predictions
             stm32_state_dict (dict): a dictionary of stm32 state
+            raw_rgb_image (np.ndarray): raw RGB image
 
         Returns:
             list: a list of tuples (armor_type, abs_yaw, abs_pitch, y_distance, z_distance)
@@ -44,39 +45,24 @@ class Aim:
 
         camera_barrel_T = get_camera_barrel_T(self.CFG)
 
-        # TODO(roger): set a constant and test transform sign
-        gimbal_yaw = 0
-        gimbal_pitch = 0
-
-        r = R.from_euler('zyx', [0, gimbal_pitch, gimbal_yaw], degrees=False)
-        gimbal_T = np.eye(4)
-        gimbal_T[:3, :3] = r.as_matrix()
-
         ret_list = []
 
         for pred in pred_list:
             armor_name, conf, armor_type, bbox, armor = pred
-            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor)
+            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor, raw_rgb_image)
+            armor_xyz = barrel_to_robot_T(gimbal_yaw, gimbal_pitch, armor_xyz)
 
-            tmp_armor_pose = np.eye(4)
-            tmp_armor_pose[:3, 3:] = armor_xyz
-
-            # Use barrel front as the origin
-            tmp_armor_pose = camera_barrel_T @ tmp_armor_pose
-            # Use gimbal and initialized yaw as the origin
-            tmp_armor_pose = gimbal_T @ tmp_armor_pose
-
-            ret_list.append((armor_type, tmp_armor_pose[:3, 3], bbox, armor_yaw))
+            ret_list.append((armor_type, armor_xyz, bbox, armor_yaw))
 
         return ret_list
 
-    def process_one(self, pred_list, enemy_team, rgb_img, stm32_state_dict):
+    def process_one(self, pred_list, enemy_team, raw_rgb_image, stm32_state_dict):
         """Process one frame of predictions.
 
         Args:
             pred_list (list): a list of predictions
             enemy_team (str): 'blue' or 'red'
-            rgb_img (np.ndarray): RGB image
+            rgb_img (np.ndarray): raw RGB image
             stm32_state_dict (dict): a dictionary of stm32 state
 
         Returns:
@@ -84,7 +70,7 @@ class Aim:
         """
         assert enemy_team in ['blue', 'red']
 
-        observed_armors = self.preprocess(pred_list, stm32_state_dict, rgb_img)
+        observed_armors = self.preprocess(pred_list, stm32_state_dict, raw_rgb_image)
 
         target_dist_angle_tuple = self.tracker.process_one(observed_armors, stm32_state_dict)
 
