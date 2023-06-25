@@ -132,3 +132,7 @@ dmypy.json
 
 # PyCharm
 .idea
+
+# Vim
+*.swp
+.cache
