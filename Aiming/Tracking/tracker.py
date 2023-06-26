@@ -218,6 +218,9 @@ class tracker:
         self.last_yaw_ = yaw
         self.target_state[6] = yaw
 
+        # TODO: check for spinning bot see if calls to this function are accurate
+        print("Armor jump detected!")
+
         # FIXME
         # self.update_armors_num()
         if self.tracked_armors_num == 'NORMAL':
