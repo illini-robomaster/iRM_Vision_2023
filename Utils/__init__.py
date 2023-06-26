@@ -3,6 +3,18 @@ import numpy as np
 import cv2
 
 
+def cartesian_to_spherical(x,y,z):
+    r = np.sqrt(x**2 + y**2 + z**2)
+    theta = np.arctan2(z, np.sqrt(x**2 + y**2))
+    phi = np.arctan2(y, x)
+    return r, theta, phi
+
+def spherical_to_cartesian(r, theta, phi):
+    x = r * np.cos(theta) * np.cos(phi)
+    y = r * np.cos(theta) * np.sin(phi)
+    z = r * np.sin(theta)
+    return x, y, z
+
 def deg_to_rad(deg):
     """Convert degree to radian."""
     return deg * ((2 * np.pi) / 360)
