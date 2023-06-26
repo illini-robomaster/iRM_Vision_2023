@@ -104,11 +104,10 @@ class tracker:
 
         same_id_armor_list = [a for a in pred_list if a[0] == self.tracked_id]
         if len(same_id_armor_list) == 3:
-            print("More than 2 armors detected?")
+            print("More than 2 samd-id armors detected?")
         elif len(same_id_armor_list) == 2:
             # Seeing two armors.
             # Pick the most front-facing one
-            print("Two armors")
             armor1_yaw_diff = np.abs(self.orientation_to_yaw(same_id_armor_list[0][3]) - ekf_pred[6])
             armor2_yaw_diff = np.abs(self.orientation_to_yaw(same_id_armor_list[1][3]) - ekf_pred[6])
             if armor1_yaw_diff < armor2_yaw_diff:
@@ -120,7 +119,6 @@ class tracker:
             else:
                 selected_armor_idx = 1
             if selected_armor_idx != prv_armor_idx:
-                print("2 armor jump!")
                 self.handle_armor_jump_(same_id_armor_list[selected_armor_idx])
             matched = True
             # Update EKF
@@ -216,7 +214,6 @@ class tracker:
             same_id_armor (armor object): another armor object of the same robot
         """
         armor_type, armor_xyz, bbox, armor_yaw = same_id_armor
-        print("Prv last yaw", self.last_yaw_)
         yaw = self.orientation_to_yaw(armor_yaw)
         self.last_yaw_ = yaw
         self.target_state[6] = yaw
