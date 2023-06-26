@@ -136,3 +136,4 @@ dmypy.json
 # Vim
 *.swp
 .cache
+pyrightconfig.json
