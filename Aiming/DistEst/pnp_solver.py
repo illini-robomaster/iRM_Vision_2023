@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as R
 
 class pnp_estimator:
     """Distance estimator using PnP.
-    
+
     TODO(roger): PnP Solver is extremely inaccurate!
         - you can try a spinning robot and plot its x/y coordinates.
         - for an ideal solver, the coordinates should be a circle.

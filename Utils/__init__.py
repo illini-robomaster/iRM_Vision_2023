@@ -3,17 +3,43 @@ import numpy as np
 import cv2
 
 
-def cartesian_to_spherical(x,y,z):
+def cartesian_to_spherical(x, y, z):
+    """Convert cartesian coordinates to spherical coordinates.
+
+    Args:
+        x (float): x coordinate
+        y (float): y coordinate
+        z (float): z coordinate
+
+    Returns:
+        r (float): radius
+        theta (float): polar angle
+        phi (float): azimuthal angle
+    """
     r = np.sqrt(x**2 + y**2 + z**2)
     theta = np.arctan2(z, np.sqrt(x**2 + y**2))
     phi = np.arctan2(y, x)
     return r, theta, phi
 
+
 def spherical_to_cartesian(r, theta, phi):
+    """Convert spherical coordinates to cartesian coordinates.
+
+    Args:
+        r (float): radius
+        theta (float): polar angle
+        phi (float): azimuthal angle
+
+    Returns:
+        x (float): x coordinate
+        y (float): y coordinate
+        z (float): z coordinate
+    """
     x = r * np.cos(theta) * np.cos(phi)
     y = r * np.cos(theta) * np.sin(phi)
     z = r * np.sin(theta)
     return x, y, z
+
 
 def deg_to_rad(deg):
     """Convert degree to radian."""

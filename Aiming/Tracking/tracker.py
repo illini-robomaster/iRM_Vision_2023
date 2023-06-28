@@ -5,6 +5,7 @@ from .consistent_id_gen import ConsistentIdGenerator
 from .EKF_filter import ExtendedKalmanFilter
 import Utils
 
+
 class tracker:
     """
     EKF tracker that selects a single robot and tracks it (can't handle multiple robots).
@@ -108,8 +109,14 @@ class tracker:
         elif len(same_id_armor_list) == 2:
             # Seeing two armors.
             # Pick the most front-facing one
-            armor1_yaw_diff = np.abs(self.orientation_to_yaw(same_id_armor_list[0][3]) - ekf_pred[6])
-            armor2_yaw_diff = np.abs(self.orientation_to_yaw(same_id_armor_list[1][3]) - ekf_pred[6])
+            armor1_yaw_diff = np.abs(
+                self.orientation_to_yaw(
+                    same_id_armor_list[0][3]) -
+                ekf_pred[6])
+            armor2_yaw_diff = np.abs(
+                self.orientation_to_yaw(
+                    same_id_armor_list[1][3]) -
+                ekf_pred[6])
             if armor1_yaw_diff < armor2_yaw_diff:
                 prv_armor_idx = 0
             else:
@@ -142,36 +149,6 @@ class tracker:
             self.measurement = np.array(
                 [mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
             self.target_state = self.ekf.update(self.measurement, dt)
-
-        # if len(pred_list) > 0:
-        #     same_id_armor = None
-        #     same_id_armors_count = 0
-        #     yaw_diff = 99999999
-        #     min_position_diff = 99999999
-        #     predicted_armor_xyz = self.get_armor_position_from_state(ekf_pred)
-        #     for armor_idx in range(len(pred_list)):
-        #         armor_type, armor_xyz, bbox, armor_yaw = pred_list[armor_idx]
-        #         if armor_type != self.tracked_id:
-        #             continue
-        #         same_id_armor = pred_list[armor_idx]
-        #         same_id_armors_count += 1
-        #         position_diff = np.linalg.norm(predicted_armor_xyz - armor_xyz)
-        #         if position_diff < min_position_diff:
-        #             min_position_diff = position_diff
-        #             self.tracked_armor = pred_list[armor_idx]
-        #             yaw_diff = np.abs(self.orientation_to_yaw(
-        #                 armor_yaw) - ekf_pred[6]) % (2 * np.pi)
-
-        #     if min_position_diff < self.MAX_MATCH_DISTANCE_ and yaw_diff < self.MAX_MATCH_YAW_DIFF_:
-        #         matched = True
-        #         # Update EKF
-        #         measured_yaw = self.orientation_to_yaw(self.tracked_armor[3])
-        #         mesuared_xyz = self.tracked_armor[1]
-        #         self.measurement = np.array(
-        #             [mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
-        #         self.target_state = self.ekf.update(self.measurement, dt)
-        #     elif same_id_armors_count == 1 and yaw_diff > self.MAX_MATCH_YAW_DIFF_:
-        #         self.handle_armor_jump_(same_id_armor)
 
         # Ad-hoc post processing
         if self.target_state[8] < 0.2:
