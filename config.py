@@ -1,4 +1,6 @@
 """Config file that is shared across the whole project."""
+import numpy as np
+
 
 # ========== Camera ==========
 from Camera.read_from_file import fake_camera
@@ -7,7 +9,7 @@ from Camera.simple_cv import simple_cv_camera
 # from Camera.d455 import D455_camera
 # from Camera.mdvs import mdvs_camera
 AUTOAIM_CAMERA = fake_camera
-
+# AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
 EXPOSURE_TIME = 5
 
@@ -20,9 +22,15 @@ IMG_CENTER_Y = IMG_HEIGHT // 2
 
 ROTATE_180 = True  # Camera is mounted upside down
 
+K = np.array([
+    [776.10564907, 0, 314.26822299],
+    [0, 775.89552525, 259.37110689],
+    [0, 0, 1],
+])
+
 # ========== Trajectory Modeling ==========
 GRAVITY_CONSTANT = 9.81         # acceleration due to gravity
-INITIAL_BULLET_SPEED = 15.0     # empirically measured
+INITIAL_BULLET_SPEED = 10.0     # empirically measured
 
 # ========== Communication ==========
 SEARCH_TARGET = b'ST'

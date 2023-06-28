@@ -1,11 +1,10 @@
 """Hosts the Aim class, which is the main class for auto-aiming."""
-from .Tracking import basic_tracker
+from .Tracking import tracker
 from .DistEst import pnp_estimator
 from .TrajModel import *
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 import Utils
-
-from IPython import embed
 
 
 class Aim:
@@ -27,15 +26,16 @@ class Aim:
             config (python object): shared config
         """
         self.CFG = config
-        self.tracker = basic_tracker(self.CFG)
+        self.tracker = tracker(self.CFG)
         self.distance_estimator = pnp_estimator(self.CFG)
 
-    def preprocess(self, pred_list, stm32_state_dict, rgb_img):
+    def preprocess(self, pred_list, stm32_state_dict, raw_rgb_image):
         """Preprocess predictions to compute armor distances and absolute yaw/pitch.
 
         Args:
             pred_list (list): a list of predictions
             stm32_state_dict (dict): a dictionary of stm32 state
+            raw_rgb_image (np.ndarray): raw RGB image
 
         Returns:
             list: a list of tuples (armor_type, abs_yaw, abs_pitch, y_distance, z_distance)
@@ -43,59 +43,26 @@ class Aim:
         gimbal_yaw = stm32_state_dict['cur_yaw']
         gimbal_pitch = stm32_state_dict['cur_pitch']
 
+        camera_barrel_T = get_camera_barrel_T(self.CFG)
+
         ret_list = []
 
         for pred in pred_list:
             armor_name, conf, armor_type, bbox, armor = pred
-            c_x, c_y, w, h = bbox
-            rel_yaw, rel_pitch = self.get_rotation_angle(c_x, c_y)
-            abs_yaw = gimbal_yaw + rel_yaw
-            abs_pitch = gimbal_pitch + rel_pitch
-            y_distance, z_distance = self.distance_estimator.estimate_distance(armor, rgb_img)
+            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor, raw_rgb_image)
+            armor_xyz = barrel_to_robot_T(gimbal_yaw, gimbal_pitch, armor_xyz)
 
-            ret_list.append((armor_type, abs_yaw, abs_pitch, y_distance, z_distance))
+            ret_list.append((armor_type, armor_xyz, bbox, armor_yaw))
 
         return ret_list
 
-    def pick_target(self, distance_angle_list, stm32_state_dict):
-        """Select a priortized target from a list of targets.
-
-        Args:
-            distance_angle_list (list): list of targets returned from tracker
-            stm32_state_dict (dict): a dictionary of stm32 state
-
-        Returns:
-            target: a tuple of (target_pitch, target_yaw, target_y_dist, target_z_dist)
-        """
-        gimbal_pitch = stm32_state_dict['cur_pitch']
-        gimbal_yaw = stm32_state_dict['cur_yaw']
-
-        target_pitch = None
-        target_yaw = None
-        target_y_dist = None
-        target_z_dist = None
-        min_angle_diff = 9999
-
-        for y_dist, z_dist, predicted_pitch, predicted_yaw in distance_angle_list:
-            pitch_diff = Utils.get_radian_diff(predicted_pitch, gimbal_pitch)
-            yaw_diff = Utils.get_radian_diff(predicted_yaw, gimbal_yaw)
-            angle_diff = pitch_diff + yaw_diff
-            if angle_diff < min_angle_diff:
-                target_pitch = predicted_pitch
-                target_yaw = predicted_yaw
-                target_y_dist = y_dist
-                target_z_dist = z_dist
-                min_angle_diff = angle_diff
-
-        return target_pitch, target_yaw, target_y_dist, target_z_dist
-
-    def process_one(self, pred_list, enemy_team, rgb_img, stm32_state_dict):
+    def process_one(self, pred_list, enemy_team, raw_rgb_image, stm32_state_dict):
         """Process one frame of predictions.
 
         Args:
             pred_list (list): a list of predictions
             enemy_team (str): 'blue' or 'red'
-            rgb_img (np.ndarray): RGB image
+            rgb_img (np.ndarray): raw RGB image
             stm32_state_dict (dict): a dictionary of stm32 state
 
         Returns:
@@ -103,38 +70,28 @@ class Aim:
         """
         assert enemy_team in ['blue', 'red']
 
-        observed_armors = self.preprocess(pred_list, stm32_state_dict, rgb_img)
+        observed_armors = self.preprocess(pred_list, stm32_state_dict, raw_rgb_image)
 
-        distance_angle_list, final_id_list = self.tracker.process_one(
-            observed_armors, enemy_team, rgb_img)
+        target_dist_angle_tuple = self.tracker.process_one(observed_armors, stm32_state_dict)
 
-        # TODO: integrate this into tracking for consistent tracking
-        target_dist_angle_tuple = self.pick_target(distance_angle_list, stm32_state_dict)
-
-        if target_dist_angle_tuple[0] is None:
+        if target_dist_angle_tuple is None or target_dist_angle_tuple[0] is None:
             return None
 
-        target_pitch, target_yaw, target_y_dist, target_z_dist = target_dist_angle_tuple
+        target_dist, target_pitch, target_yaw = target_dist_angle_tuple
 
         calibrated_pitch, calibrated_yaw = self.posterior_calibration(
-            target_pitch, target_yaw, target_y_dist, target_z_dist)
+            target_pitch, target_yaw, target_dist)
 
         return {
-            # 'yaw_diff': calibrated_yaw_diff,
-            # 'pitch_diff': calibrated_pitch_diff,
             'abs_yaw': calibrated_yaw,
             'abs_pitch': calibrated_pitch,
-            # 'center_x': center_x,
-            # 'center_y': center_y,
-            # 'final_bbox_list': final_bbox_list,
-            # 'final_id_list': final_id_list,
+            'uncalibrated_yaw': target_yaw,
+            'uncalibrated_pitch': target_pitch,
+            'target_dist': target_dist,
         }
 
-    def posterior_calibration(self, raw_pitch, raw_yaw, target_y_dist, target_z_dist):
+    def posterior_calibration(self, raw_pitch, raw_yaw, target_dist):
         """Given a set of naively estimated parameters, return calibrated parameters.
-
-        Idea:
-            Use a range table?
 
         Args:
             yaw_diff (float): yaw difference in radians
@@ -148,27 +105,7 @@ class Aim:
         target_yaw = raw_yaw
 
         # Gravity calibration
-        pitch_diff = calibrate_pitch_gravity(self.CFG, target_z_dist, target_y_dist)
+        pitch_diff = calibrate_pitch_gravity(self.CFG, target_dist)
         target_pitch -= pitch_diff
 
         return (target_pitch, target_yaw)
-
-    def get_rotation_angle(self, bbox_center_x, bbox_center_y):
-        """Given a bounding box center, return the yaw/pitch difference in radians.
-
-        Args:
-            bbox_center_x (float): x coordinate of the center of the bounding box
-            bbox_center_y (float): y coordinate of the center of the bounding box
-
-        Returns:
-            (float, float): yaw_diff, pitch_diff in radians
-        """
-        yaw_diff = (bbox_center_x - self.CFG.IMG_CENTER_X) * \
-            (self.CFG.AUTOAIM_CAMERA.YAW_FOV_HALF / self.CFG.IMG_CENTER_X)
-        pitch_diff = (bbox_center_y - self.CFG.IMG_CENTER_Y) * \
-            (self.CFG.AUTOAIM_CAMERA.PITCH_FOV_HALF / self.CFG.IMG_CENTER_Y)
-
-        yaw_diff = -yaw_diff  # counter-clockwise is positive
-        pitch_diff = pitch_diff  # down is positive
-
-        return yaw_diff, pitch_diff

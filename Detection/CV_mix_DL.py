@@ -181,6 +181,7 @@ class armor_class:
 
         self.center = (self.left_light.center + self.right_light.center) / 2
         self.armor_type = None  # 'large', 'small'
+        self.number = None  # digit number
 
     def extract_number(self, rgb_img):
         """Extract number from the armor board using perspective transform.
