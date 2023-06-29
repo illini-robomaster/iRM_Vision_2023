@@ -181,6 +181,8 @@ class tracker:
                 if self.detect_count_ > 3:
                     self.tracked_state = 'TRACKING'
                     self.detect_count_ = 0
+                if self.detect_count_ == 1:
+                    self.anti_spinning.detect_pos = self.get_armor_position_from_state(self.target_state)
             else:
                 self.detect_count_ = 0
                 self.tracked_state = 'LOST'
@@ -188,6 +190,7 @@ class tracker:
             if not matched:
                 self.tracked_state = 'TEMP_LOST'
                 self.lost_count_ += 1
+                self.anti_spinning.lost_pos = self.get_armor_position_from_state(self.target_state)
         elif self.tracked_state == 'TEMP_LOST':
             if not matched:
                 self.lost_count_ += 1
@@ -321,7 +324,6 @@ class tracker:
             self.update_tracker_(pred_list, dt)
             # Anti spinning
             if (self.anti_spinning.is_spinning(pred_list)):
-                
                 return self.anti_spinning.calculate_dist_pitch_yaw()
 
             if self.tracked_state == 'DETECTING':
