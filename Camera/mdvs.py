@@ -69,8 +69,8 @@ class mdvs_camera(CameraBase):
         else:
             mvsdk.CameraSetIspOutFormat(self.cam, mvsdk.CAMERA_MEDIA_TYPE_BGR8)
 
-        # Set camera trigger mode to continuous grab
-        mvsdk.CameraSetTriggerMode(self.cam, 0)
+        # Set camera trigger mode
+        mvsdk.CameraSetTriggerMode(self.cam, self.cfg.TRIGGER_MODE) # 0: continuous acquisition mode; 1: software trigger mode; 2: hardware trigger mode
 
         # Set to manual exposure mode and set exposure time to 30ms
         mvsdk.CameraSetAeState(self.cam, 0)
@@ -104,7 +104,7 @@ class mdvs_camera(CameraBase):
         """
         # Grab one frame from camera
         try:
-            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.cam, 200)
+            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.cam, 200000)
             mvsdk.CameraImageProcess(self.cam, pRawData, self.frame_buffer, FrameHead)
             mvsdk.CameraReleaseImageBuffer(self.cam, pRawData)
 

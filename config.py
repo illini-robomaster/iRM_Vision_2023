@@ -1,10 +1,10 @@
 """Config file that is shared across the whole project."""
 import numpy as np
 
-
 # ========== Camera ==========
 from Camera.read_from_file import fake_camera
 from Camera.simple_cv import simple_cv_camera
+
 # Define camera
 # from Camera.d455 import D455_camera
 # from Camera.mdvs import mdvs_camera
@@ -20,6 +20,7 @@ IMG_WIDTH = 640
 IMG_CENTER_X = IMG_WIDTH // 2
 IMG_CENTER_Y = IMG_HEIGHT // 2
 
+TRIGGER_MODE = 2  # 0: continuous acquisition mode; 1: software trigger mode; 2: hardware trigger mode
 ROTATE_180 = True  # Camera is mounted upside down
 
 K = np.array([
@@ -29,8 +30,8 @@ K = np.array([
 ])
 
 # ========== Trajectory Modeling ==========
-GRAVITY_CONSTANT = 9.81         # acceleration due to gravity
-INITIAL_BULLET_SPEED = 10.0     # empirically measured
+GRAVITY_CONSTANT = 9.81  # acceleration due to gravity
+INITIAL_BULLET_SPEED = 10.0  # empirically measured
 
 # ========== Communication ==========
 SEARCH_TARGET = b'ST'
