@@ -2,6 +2,12 @@
 
 repo for iRM vision.
 
+## Prepare model and data
+
+Some testing video clips and trained models are too large to be uploaded to
+git. Download them at the [UofI box](https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e)
+and put folders `./large_data` and `./weights` under the project root directory.
+
 ## Contributing
 
 Now the repo uses CI to check code style. We decided pylint is too painful to use.
@@ -27,14 +33,6 @@ To automatically fix your code to autopep8 standard, you can run
 ```bash
 autopep8 --in-place --aggressive --aggressive --max-line-length=100 --exclude="mvsdk.py" --recursive .
 ```
-
-## Data preparing
-
-We recorded some demo videos to demo auto-aiming capabilities of our robots,
-which is located under the folder `./large_data/`.
-However, due to the large sizes of the video, it's inappropriate to directly
-upload them to GitHub. Hence, to acquire theese sample videos, please download
-them at the [UofI box](https://uofi.box.com/s/i6zahotr9id35hurjzy2bq3dcfz0085e).
 
 ## Dependencies
 

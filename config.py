@@ -28,6 +28,16 @@ K = np.array([
     [0, 0, 1],
 ])
 
+# 6mm mdvs lens Center cropping intrinsics
+# K = np.array([
+#     [1.52839e+03, 0, 286.925],
+#     [0, 1527.11, 274.26],
+#     [0, 0, 1],
+# ])
+
+# ========== Detection ==========
+YOLO_PATH = "./weights/shufflenet_no_nms.onnx"
+
 # ========== Trajectory Modeling ==========
 GRAVITY_CONSTANT = 9.81         # acceleration due to gravity
 INITIAL_BULLET_SPEED = 10.0     # empirically measured

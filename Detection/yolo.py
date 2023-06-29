@@ -99,10 +99,8 @@ class yolo_detector:
             cfg (python object): python config node object
         """
         self.CFG = cfg
-        # TODO(roger): put model path in cfg
-        model_path = "shufflenet_no_nms.onnx"
         # TODO(roger): support TRT
-        self.session = onnxruntime.InferenceSession(model_path)
+        self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH)
 
         self.H, self.W = self.CFG.IMG_HEIGHT, self.CFG.IMG_WIDTH
 
@@ -144,7 +142,7 @@ class yolo_detector:
 
         outputs = self.session.run(None, {"images": img})
 
-        bbox_list = non_max_suppression_export(torch.tensor(outputs[0]), kpt_label=False)
+        bbox_list = non_max_suppression_export(torch.tensor(outputs[0]))
         assert len(bbox_list) == 1, 'input BS is 1'
 
         ret_list = []
