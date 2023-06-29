@@ -47,8 +47,10 @@ class Aim:
 
         ret_list = []
 
-        for pred in pred_list:
-            armor_name, conf, armor_type, bbox, armor = pred
+        for armor in pred_list:
+            bbox = armor.bbox
+            armor_type = armor.cls
+            # armor_name, conf, armor_type, bbox, armor = pred
             armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor, raw_rgb_image)
             armor_xyz = barrel_to_robot_T(gimbal_yaw, gimbal_pitch, armor_xyz)
 
