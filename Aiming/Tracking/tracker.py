@@ -3,7 +3,9 @@ import numpy as np
 
 from .consistent_id_gen import ConsistentIdGenerator
 from .EKF_filter import ExtendedKalmanFilter
+from .anti_spinning import anti_spinning
 import Utils
+import time
 
 
 class tracker:
@@ -45,6 +47,8 @@ class tracker:
         self.detect_count_ = 0
         self.lost_count_ = 0
         self.ekf = ExtendedKalmanFilter()
+        
+        self.anti_spinning = anti_spinning(None)
 
         # 'NORMAL', 'BALANCED', 'OUTPOST'
         self.tracked_armors_num = 'NORMAL'
@@ -85,7 +89,9 @@ class tracker:
         self.init_EKF(pred_list, selected_armor_idx)
         self.tracked_id = armor_type
         self.tracked_state = 'DETECTING'
+        self.anti_spinning = anti_spinning(selected_armor_idx)
 
+        # print (time.time())
         # FIXME
         # self.update_armors_num()
 
@@ -109,6 +115,11 @@ class tracker:
         elif len(same_id_armor_list) == 2:
             # Seeing two armors.
             # Pick the most front-facing one
+
+            # anti spinning
+            # print("Detected 2 armors!" + str(time.time()))
+            self.anti_spinning.spinning_buffer.append(2)
+
             armor1_yaw_diff = np.abs(
                 self.orientation_to_yaw(
                     same_id_armor_list[0][3]) -
@@ -136,6 +147,10 @@ class tracker:
                 [mesuared_xyz[0], mesuared_xyz[1], mesuared_xyz[2], measured_yaw])
             self.target_state = self.ekf.update(self.measurement, dt)
         elif len(same_id_armor_list) == 1:
+            # anti spinning
+            # print("Detected 1 armor!" + str(time.time()))
+            self.anti_spinning.spinning_buffer.append(1)
+
             armor_type, armor_xyz, bbox, armor_yaw = same_id_armor_list[0]
             yaw_diff = np.abs(self.orientation_to_yaw(
                 armor_yaw) - ekf_pred[6]) % (2 * np.pi)
@@ -196,7 +211,7 @@ class tracker:
         self.target_state[6] = yaw
 
         # TODO: check for spinning bot see if calls to this function are accurate
-        print("Armor jump detected!")
+        # print("Armor jump detected!")
 
         # FIXME
         # self.update_armors_num()
@@ -304,6 +319,11 @@ class tracker:
             # FIXME
             dt = 1.0 / 30.0
             self.update_tracker_(pred_list, dt)
+            # Anti spinning
+            if (self.anti_spinning.is_spinning(pred_list)):
+                
+                return self.anti_spinning.calculate_dist_pitch_yaw()
+
             if self.tracked_state == 'DETECTING':
                 return None
             elif self.tracked_state == 'TRACKING' or self.tracked_state == 'TEMP_LOST':
