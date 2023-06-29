@@ -32,6 +32,8 @@ class mdvs_camera(CameraBase):
         super().__init__(cfg)
 
         self.last_time = time.time()
+        self.print_last_time = time.time()
+        self.fps_txt = 0
 
         # Enumerate camera devices
         DevList = mvsdk.CameraEnumerateDevice()
@@ -97,7 +99,7 @@ class mdvs_camera(CameraBase):
         self.frame_buffer = mvsdk.CameraAlignMalloc(FrameBufferSize, 16)
 
         self.quit = False
-        mvsdk.CameraSetCallbackFunction(self.cam, self.GrabCallback, 0)
+        mvsdk.CameraSetCallbackFunction(self.cam, self.grab_callback, 0)
 
         while not self.quit:
             time.sleep(0.1)
@@ -141,18 +143,17 @@ class mdvs_camera(CameraBase):
                 print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
 
     @mvsdk.method(mvsdk.CAMERA_SNAP_PROC)
-    def GrabCallback(self, hCamera, pRawData, pFrameHead, pContext):
+    def grab_callback(self, hCamera, pRawData, pFrameHead, pContext):
         elasped_time = time.time() - self.last_time
         self.last_time = time.time()
         fps = 1.0 / elasped_time
 
         FrameHead = pFrameHead[0]
-        pFrameBuffer = self.pFrameBuffer
 
-        mvsdk.CameraImageProcess(hCamera, pRawData, pFrameBuffer, FrameHead)
+        mvsdk.CameraImageProcess(hCamera, pRawData, self.frame_buffer, FrameHead)
         mvsdk.CameraReleaseImageBuffer(hCamera, pRawData)
 
-        frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(pFrameBuffer)
+        frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(self.frame_buffer)
         frame = np.frombuffer(frame_data, dtype=np.uint8)
         frame = frame.reshape((FrameHead.iHeight, FrameHead.iWidth,
                                1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
@@ -161,7 +162,10 @@ class mdvs_camera(CameraBase):
         if self.cfg.ROTATE_180:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
-        frame = cv2.putText(frame, "FPS: {:.1f}".format(fps), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
+        if time.time() - self.print_last_time > 0.1:
+            self.fps_txt = fps
+            self.print_last_time = time.time()
+        frame = cv2.putText(frame, "FPS: {:.1f}".format(self.fps_txt), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
                             cv2.LINE_AA)
 
         cv2.imshow("Press q to end", frame)
