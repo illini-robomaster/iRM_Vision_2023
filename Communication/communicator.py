@@ -7,7 +7,7 @@ import threading
 from copy import deepcopy
 
 # STM32 to Jetson packet size
-STJ_PACKET_SIZE = 18
+STJ_PACKET_SIZE = 22
 INT_FP_SCALE = 1e+6
 
 
@@ -41,10 +41,12 @@ class UARTCommunicator:
 
         self.stm32_state_dict = {
             'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
-            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
+            'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM,
             'cur_yaw': 0,
             'cur_pitch': 0,
-            'debug_int': 0}
+            'cur_roll': 0,
+            'timestamp': 0
+        }
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -213,7 +215,8 @@ class UARTCommunicator:
 
         cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
         cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
-        debug_int = int.from_bytes(possible_packet[11:15], "little", signed=True)
+        cur_roll = int.from_bytes(possible_packet[11:15], "little", signed=True) / INT_FP_SCALE
+        timestamp = int.from_bytes(possible_packet[15:19], "little", signed=False) / INT_FP_SCALE
 
         if my_color_int == 0:
             my_color = 'red'
@@ -227,7 +230,8 @@ class UARTCommunicator:
             'enemy_color': enemy_color,
             'cur_yaw': cur_yaw,
             'cur_pitch': cur_pitch,
-            'debug_int': debug_int,
+            'cur_roll': cur_roll,
+            'timestamp': timestamp
         }
 
     def create_packet(self, header, yaw_offset, pitch_offset):
@@ -308,7 +312,7 @@ if __name__ == '__main__':
             uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
 
         print("Packet sending test complete.")
-        print("You should see the light change from bllue to green on type C board.")
+        print("You should see the light change from blue to green on type C board.")
         print("Starting packet receiving test.")
 
         while True:

@@ -40,7 +40,6 @@ MOVE_YOKE = b'MY'
 PACK_END = b'ED'
 
 # ========== DEBUGGING ==========
-
 DEBUG_DISPLAY = True
 DEBUG_PRINT = False
 DEFAULT_ENEMY_TEAM = 'red'

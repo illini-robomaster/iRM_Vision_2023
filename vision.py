@@ -21,14 +21,13 @@ def main():
     aimer = Aim(config)
 
     communicator = UARTCommunicator(config)
-    communicator.start_listening()
-
-    autoaim_camera = config.AUTOAIM_CAMERA(config)
-
     if communicator.is_valid():
         print("OPENED SERIAL DEVICE AT: " + communicator.serial_port.name)
     else:
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
+    communicator.start_listening()
+
+    autoaim_camera = config.AUTOAIM_CAMERA(config)
 
     while True:
         start = time.time()

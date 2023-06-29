@@ -11,15 +11,15 @@ For implementation on the Jetson side, please refer to the main communicator [he
 
 ## Packet Struct
 
-| Name          | Content                   | Size    |
-| ------------- | ------------------------- | ------- |
-| HEADER        | 2 ASCII char              | 2 bytes |
-| SEQ_NUM       | uint32_t counter          | 4 bytes |
-| REL_YAW       | int32_t discretized float | 4 bytes |
-| REL_PITCH     | int32_t discretized float | 4 bytes |
-| CRC_CHECKSUM  | uint8_t checksum          | 1 bytes |
-| PACK_END      | 2 ASCII char              | 2 bytes |
-| TOTAL         |                           | 17 bytes|
+| Name         | Content                   | Size     |
+|--------------|---------------------------|----------|
+| HEADER       | 2 ASCII char              | 2 bytes  |
+| SEQ_NUM      | uint32_t counter          | 4 bytes  |
+| REL_YAW      | int32_t discretized float | 4 bytes  |
+| REL_PITCH    | int32_t discretized float | 4 bytes  |
+| CRC_CHECKSUM | uint8_t checksum          | 1 bytes  |
+| PACK_END     | 2 ASCII char              | 2 bytes  |
+| TOTAL        |                           | 17 bytes |
 
 ## Detailed explanations
 
@@ -73,13 +73,17 @@ PACK_END (i.e., CRC is computed for the first 14 bytes up to end to REL_PITCH).
 
 ## Packet Struct
 
-| Name          | Content                   | Size    |
-| ------------- | ------------------------- | ------- |
-| HEADER        | 2 ASCII char              | 2 bytes |
-| MY_COLOR      | uint8_t ENUM              | 1 byte  |
-| CRC_CHECKSUM  | uint8_t checksum          | 1 bytes |
-| PACK_END      | 2 ASCII char              | 2 bytes |
-| TOTAL         |                           | 6 bytes |
+| Name          | Content                   | Size     |
+|---------------|---------------------------|----------|
+| HEADER        | 2 ASCII char              | 2 bytes  |
+| MY_COLOR      | uint8_t ENUM              | 1 byte   |
+| IMU_ANGLES[0] | int32_t discretized float | 4 byte   |
+| IMU_ANGLES[1] | int32_t discretized float | 4 byte   |
+| IMU_ANGLES[2] | int32_t discretized float | 4 byte   |
+| TIMESTAMP     | uint32_t unsigned int     | 4 byte   |
+| CRC_CHECKSUM  | uint8_t checksum          | 1 bytes  |
+| PACK_END      | 2 ASCII char              | 2 bytes  |
+| TOTAL         |                           | 22 bytes |
 
 Following the same convention as above, the memory layout of the STM32 is little-endian.
 
@@ -91,11 +95,19 @@ Following the same convention as above, the memory layout of the STM32 is little
 
 uint8_t ENUM. This is the color of the robot. 0 stands for red, 1 stands for blue.
 
+### IMU_ANGLES[3]
+
+int32_t discretized float[3]. The 3 data values from IMU.
+
+### TIMESTAMP
+
+uint32_t unsigned int. The timestamp for the current data package from STM32 in micro seconds.
+
 ### CRC_CHECKSUM
 
 uint8_t checksum. This is the CRC checksum of the packet. The CRC standard used
 is the MAXIM_DOW standard. The CRC checksum is calculated on the packet contents BEFORE the
-PACK_END (i.e., CRC is computed for bytes preceeding, but not including, the CRC_CHECKSUM).
+PACK_END (i.e., CRC is computed for bytes preceding, but not including, the CRC_CHECKSUM).
 
 ### PACK_END
 
