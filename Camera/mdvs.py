@@ -31,6 +31,8 @@ class mdvs_camera(CameraBase):
         """
         super().__init__(cfg)
 
+        self.last_time = time.time()
+
         # Enumerate camera devices
         DevList = mvsdk.CameraEnumerateDevice()
         nDev = len(DevList)
@@ -70,7 +72,9 @@ class mdvs_camera(CameraBase):
             mvsdk.CameraSetIspOutFormat(self.cam, mvsdk.CAMERA_MEDIA_TYPE_BGR8)
 
         # Set camera trigger mode
-        mvsdk.CameraSetTriggerMode(self.cam, self.cfg.TRIGGER_MODE) # 0: continuous acquisition mode; 1: software trigger mode; 2: hardware trigger mode
+        mvsdk.CameraSetTriggerMode(self.cam,
+                                   self.cfg.TRIGGER_MODE)  # 0: continuous acquisition mode; 1: software trigger
+        # mode; 2: hardware trigger mode
 
         # Set to manual exposure mode and set exposure time to 30ms
         mvsdk.CameraSetAeState(self.cam, 0)
@@ -83,8 +87,7 @@ class mdvs_camera(CameraBase):
 
         # Compute how much buffer is needed to store the image
         # Use maximum supported resolution of the camera to compute
-        FrameBufferSize = cap.sResolutionRange.iWidthMax * \
-            cap.sResolutionRange.iHeightMax * (1 if monoCamera else 3)
+        FrameBufferSize = cap.sResolutionRange.iWidthMax * cap.sResolutionRange.iHeightMax * (1 if monoCamera else 3)
 
         # Allocate RGB buffer, used to store the image converted from RAW by ISP
         # Remark: RAW data is transferred to PC, and then converted to RGB by software ISP
@@ -92,6 +95,12 @@ class mdvs_camera(CameraBase):
         # but the ISP still has other processing, so this buffer is still
         # needed
         self.frame_buffer = mvsdk.CameraAlignMalloc(FrameBufferSize, 16)
+
+        self.quit = False
+        mvsdk.CameraSetCallbackFunction(self.cam, self.GrabCallback, 0)
+
+        while not self.quit:
+            time.sleep(0.1)
 
     def get_frame(self):
         """Call to get a frame from the camera.
@@ -104,7 +113,7 @@ class mdvs_camera(CameraBase):
         """
         # Grab one frame from camera
         try:
-            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.cam, 200000)
+            pRawData, FrameHead = mvsdk.CameraGetImageBuffer(self.cam, self.cfg.GRAB_WAIT)
             mvsdk.CameraImageProcess(self.cam, pRawData, self.frame_buffer, FrameHead)
             mvsdk.CameraReleaseImageBuffer(self.cam, pRawData)
 
@@ -112,8 +121,8 @@ class mdvs_camera(CameraBase):
             # For color cameras, pFrameBuffer = RGB data, and formono cameras,
             # pFrameBuffer = 8-bit grayscale data
             frame_data = (
-                mvsdk.c_ubyte *
-                FrameHead.uBytes).from_address(
+                    mvsdk.c_ubyte *
+                    FrameHead.uBytes).from_address(
                 self.frame_buffer)
 
             # Convert C array to numpy array
@@ -130,6 +139,34 @@ class mdvs_camera(CameraBase):
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
                 print("CameraGetImageBuffer failed({}): {}".format(e.error_code, e.message))
+
+    @mvsdk.method(mvsdk.CAMERA_SNAP_PROC)
+    def GrabCallback(self, hCamera, pRawData, pFrameHead, pContext):
+        elasped_time = time.time() - self.last_time
+        self.last_time = time.time()
+        fps = 1.0 / elasped_time
+
+        FrameHead = pFrameHead[0]
+        pFrameBuffer = self.pFrameBuffer
+
+        mvsdk.CameraImageProcess(hCamera, pRawData, pFrameBuffer, FrameHead)
+        mvsdk.CameraReleaseImageBuffer(hCamera, pRawData)
+
+        frame_data = (mvsdk.c_ubyte * FrameHead.uBytes).from_address(pFrameBuffer)
+        frame = np.frombuffer(frame_data, dtype=np.uint8)
+        frame = frame.reshape((FrameHead.iHeight, FrameHead.iWidth,
+                               1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
+
+        frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+        if self.cfg.ROTATE_180:
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
+
+        frame = cv2.putText(frame, "FPS: {:.1f}".format(fps), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
+                            cv2.LINE_AA)
+
+        cv2.imshow("Press q to end", frame)
+        if (cv2.waitKey(1) & 0xFF) == ord('q'):
+            self.quit = True
 
     def __del__(self):
         """Clean up MDVS driver connection and buffer."""
