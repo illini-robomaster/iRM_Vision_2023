@@ -7,7 +7,6 @@ import Utils
 from Camera import mvsdk
 from Camera.camera_base import CameraBase
 
-
 class mdvs_camera(CameraBase):
     """MDVS camera driver.
 
@@ -23,7 +22,7 @@ class mdvs_camera(CameraBase):
     YAW_FOV_HALF = Utils.deg_to_rad(46.245) / 2
     PITCH_FOV_HALF = Utils.deg_to_rad(37.761) / 2
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, camera_event=None):
         """Initialize the MDVS camera.
 
         Args:
@@ -31,9 +30,12 @@ class mdvs_camera(CameraBase):
         """
         super().__init__(cfg)
 
-        self.last_time = time.time()
-        self.print_last_time = time.time()
-        self.fps_txt = 0
+        # self.last_time = time.time()
+        # self.print_last_time = time.time()
+        # self.fps_txt = 0
+        self.event_time = -1
+        self.event = camera_event
+        self.frame = None
 
         # Enumerate camera devices
         DevList = mvsdk.CameraEnumerateDevice()
@@ -144,9 +146,9 @@ class mdvs_camera(CameraBase):
 
     @mvsdk.method(mvsdk.CAMERA_SNAP_PROC)
     def grab_callback(self, hCamera, pRawData, pFrameHead, pContext):
-        elasped_time = time.time() - self.last_time
-        self.last_time = time.time()
-        fps = 1.0 / elasped_time
+        # elasped_time = time.time() - self.last_time
+        # self.last_time = time.time()
+        # fps = 1.0 / elasped_time
 
         FrameHead = pFrameHead[0]
 
@@ -162,15 +164,25 @@ class mdvs_camera(CameraBase):
         if self.cfg.ROTATE_180:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
-        if time.time() - self.print_last_time > 0.1:
-            self.fps_txt = fps
-            self.print_last_time = time.time()
-        frame = cv2.putText(frame, "FPS: {:.1f}".format(self.fps_txt), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
-                            cv2.LINE_AA)
+        self.frame = frame
+        self.event_time = time.time()
+        self.event.set()
 
-        cv2.imshow("Press q to end", frame)
-        if (cv2.waitKey(1) & 0xFF) == ord('q'):
-            self.quit = True
+        # if time.time() - self.print_last_time > 0.1:
+        #     self.fps_txt = fps
+        #     self.print_last_time = time.time()
+        # frame = cv2.putText(frame, "FPS: {:.1f}".format(self.fps_txt), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
+        #                     cv2.LINE_AA)
+        #
+        # cv2.imshow("Press q to end", frame)
+        # if (cv2.waitKey(1) & 0xFF) == ord('q'):
+        #     self.quit = True
+
+    def get_event_time(self):
+        return self.event_time
+
+    def get_frame_cache(self):
+        return self.frame
 
     def __del__(self):
         """Clean up MDVS driver connection and buffer."""

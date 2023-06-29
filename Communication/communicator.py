@@ -53,6 +53,8 @@ class UARTCommunicator:
 
         self.state_dict_lock = threading.Lock()
 
+        self.event_time = -1
+
     def start_listening(self):
         """Start a thread to listen to the serial port."""
         self.listen_thread = threading.Thread(target=self.listen_)
@@ -225,6 +227,8 @@ class UARTCommunicator:
             my_color = 'blue'
             enemy_color = 'red'
 
+        self.event_time = time.time()
+
         return {
             'my_color': my_color,
             'enemy_color': enemy_color,
@@ -294,15 +298,20 @@ class UARTCommunicator:
         self.state_dict_lock.release()
         return ret_dict
 
+    def get_event_time(self):
+        return self.event_time
+
 
 if __name__ == '__main__':
     TESTING_CRC = False
     # Testing example if run as main
     import sys
     import os
+
     # setting path
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     import config
+
     uart = UARTCommunicator(config)
 
     if TESTING_CRC:
