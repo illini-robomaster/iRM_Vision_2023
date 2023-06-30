@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import time
+import threading
 import Utils
 
 from Camera import mvsdk
@@ -22,19 +23,13 @@ class mdvs_camera(CameraBase):
     YAW_FOV_HALF = Utils.deg_to_rad(46.245) / 2
     PITCH_FOV_HALF = Utils.deg_to_rad(37.761) / 2
 
-    def __init__(self, cfg, camera_event=None):
+    def __init__(self, cfg):
         """Initialize the MDVS camera.
 
         Args:
             cfg (python object): shared config object
         """
         super().__init__(cfg)
-
-        # self.last_time = time.time()
-        # self.print_last_time = time.time()
-        # self.fps_txt = 0
-        self.event_time = -1
-        self.event = camera_event
         self.frame = None
 
         # Enumerate camera devices
@@ -100,10 +95,20 @@ class mdvs_camera(CameraBase):
         # needed
         self.frame_buffer = mvsdk.CameraAlignMalloc(FrameBufferSize, 16)
 
-        self.quit = False
-        mvsdk.CameraSetCallbackFunction(self.cam, self.grab_callback, 0)
+        self.buffer_lock = threading.Lock()
 
-        while not self.quit:
+        self.alive = False
+    
+    def start_grabbing(self, event):
+        self.event_time = -1
+        self.event = event
+        self.grabbing_thread = threading.Thread(target=self.grabbing_frame_)
+        self.grabbing_thread.start()
+    
+    def grabbing_frame_(self):
+        mvsdk.CameraSetCallbackFunction(self.cam, self.grab_callback, 0)
+        self.alive = True
+        while self.alive:
             time.sleep(0.1)
 
     def get_frame(self):
@@ -164,25 +169,23 @@ class mdvs_camera(CameraBase):
         if self.cfg.ROTATE_180:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
+        self.buffer_lock.acquire()
         self.frame = frame
         self.event_time = time.time()
+        self.buffer_lock.release()
         self.event.set()
 
-        # if time.time() - self.print_last_time > 0.1:
-        #     self.fps_txt = fps
-        #     self.print_last_time = time.time()
-        # frame = cv2.putText(frame, "FPS: {:.1f}".format(self.fps_txt), (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2,
-        #                     cv2.LINE_AA)
-        #
-        # cv2.imshow("Press q to end", frame)
-        # if (cv2.waitKey(1) & 0xFF) == ord('q'):
-        #     self.quit = True
-
     def get_event_time(self):
-        return self.event_time
+        self.buffer_lock.acquire()
+        ret = self.event_time
+        self.buffer_lock.release()
+        return ret
 
     def get_frame_cache(self):
-        return self.frame
+        self.buffer_lock.acquire()
+        ret = self.frame
+        self.buffer_lock.release()
+        return ret
 
     def __del__(self):
         """Clean up MDVS driver connection and buffer."""

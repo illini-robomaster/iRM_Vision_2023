@@ -11,7 +11,7 @@ elapsed_time = 0
 print_last_time = 0
 fps_txt = 0
 
-def trigger(camera_event):
+def trigger(camera_event, camera):
     while True:
         camera_event.wait()
         print("Triggering camera event!")
@@ -33,10 +33,12 @@ def trigger(camera_event):
 def main():
     camera_event = threading.Event()
 
-    trigger_thread = threading.Thread(target=trigger, args=(camera_event,))
+    camera = mdvs_camera(config)
+
+    trigger_thread = threading.Thread(target=trigger, args=(camera_event, camera))
     trigger_thread.start()
 
-    camera = mdvs_camera(config, camera_event)
+    camera.start_grabbing(camera_event)
 
     communicator = UARTCommunicator(config)
     if communicator.is_valid():
@@ -45,6 +47,8 @@ def main():
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
     communicator.start_listening()
 
+    while True:
+        time.sleep(1)  # main thread sleeps forever
 
 if __name__ == "__main__":
     main()
