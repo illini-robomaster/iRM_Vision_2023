@@ -190,6 +190,13 @@ class TensorRTBackendRep(BackendRep):
         self._logger = TRT_LOGGER
         self.builder = trt.Builder(self._logger)
         self.config = self.builder.create_builder_config()
+        if self.builder.platform_has_fast_fp16:
+            print("FAST FP16 detected. Enabling precision to FP16...\n")
+            self.config.set_flag(trt.BuilderFlag.FP16)
+        # Temporary disable INT8 because it causes SegFault for unknown reason
+        # if self.builder.platform_has_fast_int8:
+        #     print("FAST INT8 detected. Enabling INT8...")
+        #     self.config.set_flag(trt.BuilderFlag.INT8)
         self.network = self.builder.create_network(flags=1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
         self.parser = trt.OnnxParser(self.network, self._logger)
         self.shape_tensor_inputs = []
