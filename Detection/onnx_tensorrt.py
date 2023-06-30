@@ -183,26 +183,26 @@ class Engine(object):
 
 class TensorRTBackendRep(BackendRep):
     def __init__(self, model, device,
-            max_workspace_size=None, serialize_engine=False, verbose=False, **kwargs):
+            max_workspace_size=None, serialize_engine=False, verbose=False,
+            serialized_engine_path=None, **kwargs):
         if not isinstance(device, Device):
             device = Device(device)
         self._set_device(device)
+        self.serialized_engine_path = serialized_engine_path
         self._logger = TRT_LOGGER
         self.builder = trt.Builder(self._logger)
         self.config = self.builder.create_builder_config()
         if self.builder.platform_has_fast_fp16:
-            print("FAST FP16 detected. Enabling precision to FP16...\n")
+            print("FAST FP16 detected. Enabling precision to FP16...")
             self.config.set_flag(trt.BuilderFlag.FP16)
-        # Temporary disable INT8 because it causes SegFault for unknown reason
-        # if self.builder.platform_has_fast_int8:
-        #     print("FAST INT8 detected. Enabling INT8...")
-        #     self.config.set_flag(trt.BuilderFlag.INT8)
+#         if self.builder.platform_has_fast_int8:
+#             print("FAST INT8 detected. Enabling INT8...")
+#             self.config.set_flag(trt.BuilderFlag.INT8)
         self.network = self.builder.create_network(flags=1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
         self.parser = trt.OnnxParser(self.network, self._logger)
         self.shape_tensor_inputs = []
         self.serialize_engine = serialize_engine
         self.verbose = verbose
-        self.dynamic = False
 
         if self.verbose:
             print(f'\nRunning {model.graph.name}...')
@@ -224,17 +224,11 @@ class TensorRTBackendRep(BackendRep):
                     (error.file(), error.line(), error.func(),
                      error.code(), error.desc()))
             raise RuntimeError(msg)
+        
         if max_workspace_size is None:
             max_workspace_size = 1 << 28
 
         self.config.max_workspace_size = max_workspace_size
-
-        num_inputs = self.network.num_inputs
-        for idx in range(num_inputs):
-            inp_tensor = self.network.get_input(idx)
-            if inp_tensor.is_shape_tensor or -1 in inp_tensor.shape:
-                self.dynamic = True
-                break
 
         if self.verbose:
             for layer in self.network:
@@ -242,11 +236,16 @@ class TensorRTBackendRep(BackendRep):
 
             print(f'Output shape: {self.network[-1].get_output(0).shape}')
 
-        if self.dynamic:
-            if self.verbose:
-                print("Found dynamic inputs! Deferring engine build to run stage")
+        if os.path.exists(self.serialized_engine_path):
+            del self.parser
+            self.runtime = trt.Runtime(TRT_LOGGER)
+            print("Loading serialized engine from {}".format(self.serialized_engine_path))
+            with open(self.serialized_engine_path, 'rb') as f:
+                trt_engine = self.runtime.deserialize_cuda_engine(f.read())
+            self.engine = Engine(trt_engine)
         else:
             self._build_engine()
+        
         self._output_shapes = {}
         self._output_dtype = {}
         for output in model.graph.output:
@@ -287,7 +286,7 @@ class TensorRTBackendRep(BackendRep):
         if trt_engine is None:
             raise RuntimeError("Failed to build TensorRT engine from network")
         if self.serialize_engine:
-            trt_engine = self._serialize_deserialize(trt_engine)
+            trt_engine = self._serialize_deserialize(trt_engine, self.serialized_engine_path)
         self.engine = Engine(trt_engine)
 
     def _set_device(self, device):
@@ -295,9 +294,14 @@ class TensorRTBackendRep(BackendRep):
         assert(device.type == DeviceType.CUDA)
         cudaSetDevice(device.device_id)
 
-    def _serialize_deserialize(self, trt_engine):
+    def _serialize_deserialize(self, trt_engine, serialized_engine_path):
+        # TODO(roger): unify load and save functions
         self.runtime = trt.Runtime(TRT_LOGGER)
         serialized_engine = trt_engine.serialize()
+        if serialized_engine_path is not None:
+            with open(serialized_engine_path, 'wb') as f:
+                f.write(serialized_engine)
+            print("Serialized engine written to {}".format(serialized_engine_path))
         del self.parser # Parser no longer needed for ownership of plugins
         trt_engine = self.runtime.deserialize_cuda_engine(
                 serialized_engine)
@@ -309,9 +313,6 @@ class TensorRTBackendRep(BackendRep):
         """
         if isinstance(inputs, np.ndarray):
             inputs = [inputs]
-
-        if self.dynamic:
-            self._build_engine(inputs)
 
         outputs = self.engine.run(inputs)
         output_names = [output.name for output in self.engine.outputs]
