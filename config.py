@@ -21,7 +21,7 @@ IMG_CENTER_X = IMG_WIDTH // 2
 IMG_CENTER_Y = IMG_HEIGHT // 2
 
 TRIGGER_MODE = 2  # 0: continuous acquisition mode; 1: software trigger mode; 2: hardware trigger mode
-GRAB_WAIT = 20000
+GRAB_WAIT = 200
 ROTATE_180 = True  # Camera is mounted upside down
 
 K = np.array([
