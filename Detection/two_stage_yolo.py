@@ -90,7 +90,35 @@ class two_stage_yolo_detector:
 
         resized_rgb_frame = cv2.cvtColor(resized_bgr_frame, cv2.COLOR_BGR2RGB)
 
+        if self.CFG.DEBUG_DISPLAY:
+            viz_img = resized_bgr_frame.copy()
+
         pred_list = self.yolo.detect(resized_rgb_frame)
+
+        if self.CFG.DEBUG_DISPLAY:
+            for min_x, min_y, max_x, max_y, conf, cls_name in pred_list:
+                viz_img = cv2.rectangle(viz_img, (min_x, min_y), (max_x, max_y), (0, 255, 0), 2)
+                viz_img = cv2.putText(viz_img,
+                                      cls_name,
+                                      (min_x, min_y),
+                                      cv2.FONT_HERSHEY_SIMPLEX,
+                                      1,
+                                      (0, 255, 0),
+                                      2,
+                                      cv2.LINE_AA)
+        
+        if self.CFG.DEBUG_DISPLAY:
+            # write current enemy team color on the frame
+            viz_img = cv2.putText(viz_img,
+                                    self.target_color,
+                                    (50, 50),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    1,
+                                    (0, 255, 0),
+                                    2,
+                                    cv2.LINE_AA)
+            cv2.imshow('yolo', viz_img)
+            cv2.waitKey(1)
 
         pred_list = [pred for pred in pred_list if pred[5].startswith(self.target_color_prefix)]
 

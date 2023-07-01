@@ -130,8 +130,6 @@ class yolo_detector:
         Returns:
             list: list of prediction tuples
         """
-        if self.CFG.DEBUG_DISPLAY:
-            viz_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
         assert rgb_img.shape[:2] == (512, 640)
         img = self.pad_img(rgb_img)
 
@@ -152,24 +150,10 @@ class yolo_detector:
             min_x, min_y, max_x, max_y = int(min_x), int(min_y), int(max_x), int(max_y)
             conf = float(conf)
             cls_name = self.CLASS_NAMES_LIST[int(armor_type)]
-            if self.CFG.DEBUG_DISPLAY:
-                viz_img = cv2.rectangle(viz_img, (min_x, min_y), (max_x, max_y), (0, 255, 0), 2)
-                viz_img = cv2.putText(viz_img,
-                                      cls_name,
-                                      (min_x, min_y),
-                                      cv2.FONT_HERSHEY_SIMPLEX,
-                                      1,
-                                      (0, 255, 0),
-                                      2,
-                                      cv2.LINE_AA)
 
             ret_tuple = (min_x, min_y, max_x, max_y, conf, cls_name)
 
             ret_list.append(ret_tuple)
-
-        if self.CFG.DEBUG_DISPLAY:
-            cv2.imshow('yolo', viz_img)
-            cv2.waitKey(1)
 
         return ret_list
 
