@@ -99,8 +99,11 @@ class yolo_detector:
             cfg (python object): python config node object
         """
         self.CFG = cfg
-        # TODO(roger): support TRT
-        self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH)
+        if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+            providers = ['CUDAExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+        self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH, providers=providers)
 
         self.H, self.W = self.CFG.IMG_HEIGHT, self.CFG.IMG_WIDTH
 
