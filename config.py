@@ -1,6 +1,6 @@
 """Config file that is shared across the whole project."""
+import os
 import numpy as np
-
 
 # ========== Camera ==========
 from Camera.read_from_file import fake_camera
@@ -36,7 +36,7 @@ K = np.array([
 # ])
 
 # ========== Detection ==========
-YOLO_PATH = "./weights/shufflenet_no_nms.onnx"
+YOLO_PATH = os.path.join(os.path.dirname(__file__), 'weights', 'shufflenet_no_nms.onnx')
 
 # ========== Trajectory Modeling ==========
 GRAVITY_CONSTANT = 9.81         # acceleration due to gravity
