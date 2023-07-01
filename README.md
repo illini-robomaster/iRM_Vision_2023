@@ -19,8 +19,8 @@ Code that fails the CI will **NOT** be merged.
 To check if your code is conform to the standard, run
 
 ```bash
-pycodestyle --max-line-length=100 .
-pydocstyle .
+pycodestyle --max-line-length=100 --exclude="Camera/mvsdk.py" ./
+pydocstyle --match='(?!test_)(?!mvsdk).*\.py' ./
 ```
 
 These two tools can be installed from either pip or anaconda.
