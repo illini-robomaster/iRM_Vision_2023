@@ -4,6 +4,7 @@ import serial
 import crc
 import time
 import threading
+import platform
 from copy import deepcopy
 
 # STM32 to Jetson packet size
@@ -133,7 +134,16 @@ class UARTCommunicator:
         # list of possible prefixes
         UART_PREFIX_LIST = ("tty.usbmodem", "ttyUSB", "ttyACM")
 
-        dev_list = os.listdir("/dev")
+        if platform.system() == 'Darwin' or platform.system() == 'Linux':
+            dev_list = os.listdir("/dev")
+        elif platform.system() == 'Windows':
+            print("Windows is not yet supported for serial driver!")
+            print("Writing to vaccum!")
+            return None
+        else:
+            print("Unknown system: {}".format(platform.system()))
+            print("Writing to vaccum!")
+            return None
 
         serial_port = None  # ret val
 

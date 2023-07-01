@@ -1,9 +1,25 @@
-"""YOLO detector using ONNX backbone."""
-import onnxruntime
+"""YOLO detector using ONNX network."""
+import os
 import numpy as np
 import cv2
 import torch
 import torchvision
+
+try:
+    import onnxruntime
+    HAS_ORT = True
+except ImportError:
+    HAS_ORT = False
+
+try:
+    from .onnx_tensorrt import TensorRTBackend
+    HAS_TRT = True
+except ImportError:
+    HAS_TRT = False
+
+if not HAS_ORT and not HAS_TRT:
+    raise ImportError(
+        'You need to install either onnxruntime or tensorrt to use YOLOv7 detector')
 
 # Implementation based on YOLOv7
 
@@ -99,8 +115,22 @@ class yolo_detector:
             cfg (python object): python config node object
         """
         self.CFG = cfg
-        # TODO(roger): support TRT
-        self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH)
+        assert os.path.exists(self.CFG.YOLO_PATH), self.CFG.YOLO_PATH
+        if HAS_TRT:
+            serialized_engine_path = self.CFG.YOLO_PATH + '.trt'
+            self.trt_engine = TensorRTBackend.prepare(self.CFG.YOLO_PATH,
+                                                      device='CUDA:0',
+                                                      serialize_engine=True,
+                                                      verbose=False,
+                                                      serialized_engine_path=serialized_engine_path)
+        elif HAS_ORT:
+            if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+                providers = ['CUDAExecutionProvider']
+            else:
+                providers = ['CPUExecutionProvider']
+            self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH, providers=providers)
+        else:
+            raise NotImplementedError
 
         self.H, self.W = self.CFG.IMG_HEIGHT, self.CFG.IMG_WIDTH
 
@@ -138,9 +168,16 @@ class yolo_detector:
         img = img / 255.0
         img = img[None].astype(np.float32)
 
-        outputs = self.session.run(None, {"images": img})
+        if HAS_TRT:
+            outputs = self.trt_engine.run(img)
+            raw_pred = outputs[3]
+        elif HAS_ORT:
+            outputs = self.session.run(None, {"images": img})
+            raw_pred = outputs[0]
+        else:
+            raise NotImplementedError
 
-        bbox_list = non_max_suppression_export(torch.tensor(outputs[0]))
+        bbox_list = non_max_suppression_export(torch.tensor(raw_pred))
         assert len(bbox_list) == 1, 'input BS is 1'
 
         ret_list = []
