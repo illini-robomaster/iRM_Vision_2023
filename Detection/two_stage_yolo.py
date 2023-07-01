@@ -108,17 +108,17 @@ class two_stage_yolo_detector:
                                       (0, 255, 0),
                                       2,
                                       cv2.LINE_AA)
-        
+
         if self.CFG.DEBUG_DISPLAY:
             # write current enemy team color on the frame
             viz_img = cv2.putText(viz_img,
-                                    self.target_color,
-                                    (50, 50),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    1,
-                                    (0, 255, 0),
-                                    2,
-                                    cv2.LINE_AA)
+                                  self.target_color,
+                                  (50, 50),
+                                  cv2.FONT_HERSHEY_SIMPLEX,
+                                  1,
+                                  (0, 255, 0),
+                                  2,
+                                  cv2.LINE_AA)
             cv2.imshow('yolo', viz_img)
             cv2.waitKey(1)
 
