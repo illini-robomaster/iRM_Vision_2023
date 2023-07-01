@@ -88,7 +88,9 @@ class two_stage_yolo_detector:
         if raw_bgr_frame is None:
             raw_bgr_frame = resized_bgr_frame
 
-        resized_rgb_frame = cv2.cvtColor(resized_bgr_frame, cv2.COLOR_BGR2RGB)
+        # Use this trick than cvtColor gives insane speedup
+        # On 5950x, cvtColor takes 0.004s; this takes 1e-06s
+        resized_rgb_frame = resized_bgr_frame[:, :, ::-1]
 
         pred_list = self.yolo.detect(resized_rgb_frame)
 
