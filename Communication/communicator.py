@@ -28,6 +28,7 @@ class UARTCommunicator:
             endianness (str): endianness of the packet. Either 'big' or 'little'
             buffer_size (int): size of the circular buffer
         """
+        self.listen_thread = None
         self.cfg = cfg
         self.crc_standard = crc_standard
         self.endianness = endianness
@@ -89,7 +90,7 @@ class UARTCommunicator:
         """
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
-            if (self.serial_port.inWaiting() > 0):
+            if self.serial_port.inWaiting() > 0:
                 # read the bytes and convert from binary array to ASCII
                 try:
                     byte_array = self.serial_port.read(self.serial_port.inWaiting())
@@ -280,7 +281,7 @@ class UARTCommunicator:
 
         # Compute CRC
         crc8_checksum = self.crc_calculator.checksum(packet)
-        assert crc8_checksum >= 0 and crc8_checksum < 256
+        assert 0 <= crc8_checksum < 256
 
         packet += crc8_checksum.to_bytes(1, self.endianness)
 

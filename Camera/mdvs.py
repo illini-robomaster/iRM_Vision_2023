@@ -4,7 +4,6 @@ import numpy as np
 import time
 import threading
 import Utils
-
 from Camera import mvsdk
 from Camera.camera_base import CameraBase
 
@@ -94,22 +93,12 @@ class mdvs_camera(CameraBase):
         # but the ISP still has other processing, so this buffer is still
         # needed
         self.frame_buffer = mvsdk.CameraAlignMalloc(FrameBufferSize, 16)
-
         self.buffer_lock = threading.Lock()
 
-        self.alive = False
-    
     def start_grabbing(self, event):
         self.event_time = -1
         self.event = event
-        self.grabbing_thread = threading.Thread(target=self.grabbing_frame_)
-        self.grabbing_thread.start()
-    
-    def grabbing_frame_(self):
         mvsdk.CameraSetCallbackFunction(self.cam, self.grab_callback, 0)
-        self.alive = True
-        while self.alive:
-            time.sleep(0.1)
 
     def get_frame(self):
         """Call to get a frame from the camera.
@@ -151,10 +140,7 @@ class mdvs_camera(CameraBase):
 
     @mvsdk.method(mvsdk.CAMERA_SNAP_PROC)
     def grab_callback(self, hCamera, pRawData, pFrameHead, pContext):
-        # elasped_time = time.time() - self.last_time
-        # self.last_time = time.time()
-        # fps = 1.0 / elasped_time
-
+        self.buffer_lock.acquire()
         FrameHead = pFrameHead[0]
 
         mvsdk.CameraImageProcess(hCamera, pRawData, self.frame_buffer, FrameHead)
@@ -169,7 +155,6 @@ class mdvs_camera(CameraBase):
         if self.cfg.ROTATE_180:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
-        self.buffer_lock.acquire()
         self.frame = frame
         self.event_time = time.time()
         self.buffer_lock.release()
