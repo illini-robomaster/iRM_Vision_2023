@@ -7,6 +7,7 @@ Enhanced with the following features:
     - Support serialization/deserialization of TensorRT engines to speed up
 """
 from __future__ import print_function
+import os
 import tensorrt as trt
 from onnx.backend.base import Backend, BackendRep, Device, DeviceType, namedtupledict
 import onnx
@@ -195,6 +196,7 @@ class TensorRTBackendRep(BackendRep):
         if self.builder.platform_has_fast_fp16:
             print("FAST FP16 detected. Enabling precision to FP16...")
             self.config.set_flag(trt.BuilderFlag.FP16)
+        # TODO(roger): enable INT8 requires post-training quantization and calibration
 #         if self.builder.platform_has_fast_int8:
 #             print("FAST INT8 detected. Enabling INT8...")
 #             self.config.set_flag(trt.BuilderFlag.INT8)
@@ -244,6 +246,7 @@ class TensorRTBackendRep(BackendRep):
                 trt_engine = self.runtime.deserialize_cuda_engine(f.read())
             self.engine = Engine(trt_engine)
         else:
+            print("First time building engine. This may take a while... (up to 20 minutes)")
             self._build_engine()
         
         self._output_shapes = {}
@@ -386,11 +389,12 @@ def make_node_test_model(node, inputs, use_weights=True):
 
 class TensorRTBackend(Backend):
     @classmethod
-    def prepare(cls, model, device='CUDA:0', **kwargs):
+    def prepare(cls, onnx_model_path, device='CUDA:0', **kwargs):
         """Build an engine from the given model.
         model -- An ONNX model as a deserialized protobuf, or a string or file-
                  object containing a serialized protobuf.
         """
+        model = onnx.load(onnx_model_path)
         super(TensorRTBackend, cls).prepare(model, device, **kwargs)
         return TensorRTBackendRep(model, device, **kwargs)
     
