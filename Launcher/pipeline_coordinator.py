@@ -3,7 +3,7 @@ import threading
 
 class pipeline_coordinator:
     def __init__(self, stall_policy):
-        assert stall_policy in ['drop', 'keep_all']
+        assert stall_policy in ['drop', 'debug_keep_all']
         self.stall_policy = stall_policy
 
         # Registration
@@ -15,6 +15,8 @@ class pipeline_coordinator:
         # This records data flow *after* a stage
         # e.g., self.stage_dataflow_buffer[1] contains output from stage 1
         self.stage_dataflow_buffer = {}
+
+        self.tic_tac_dict = {}
     
     def register_pipeline(self, stage, func, name, input_list=[], output_list=[]):
         if stage == 1:
@@ -25,6 +27,19 @@ class pipeline_coordinator:
         self.stage_registration_dict[stage]['name'] = name
         self.stage_registration_dict[stage]['inputs'] = input_list
         self.stage_registration_dict[stage]['outputs'] = output_list
+
+        self.tic_tac_dict[stage] = {
+            'total_time': 0,
+            'total_calls': 0,
+            'min_time': 999,
+            'max_time': 0,
+        }
+    
+    def record_time(self, stage, time_elapsed):
+        self.tic_tac_dict[stage]['total_time'] += time_elapsed
+        self.tic_tac_dict[stage]['total_calls'] += 1
+        self.tic_tac_dict[stage]['min_time'] = min(self.tic_tac_dict[stage]['min_time'], time_elapsed)
+        self.tic_tac_dict[stage]['max_time'] = max(self.tic_tac_dict[stage]['max_time'], time_elapsed)
     
     def parse_all_stage(self):
         self.max_stage = max(self.stage_registration_dict.keys())
@@ -37,6 +52,7 @@ class pipeline_coordinator:
                 assert self.stage_registration_dict[stage_num]['inputs'] == []
                 def thread_func_factory(k):
                     while True:
+                        start_cp = time.time()
                         # Pass through the function in the current stage
                         output_dict = self.stage_registration_dict[k]['func']()
                         if isinstance(output_dict, tuple):
@@ -50,6 +66,8 @@ class pipeline_coordinator:
                         self.stage_dataflow_buffer[k]['data'].append(output_dict)
                         self.stage_dataflow_buffer[k]['lock'].release()
                         time.sleep(0.001)
+                        end_cp = time.time()
+                        self.record_time(k, end_cp - start_cp)
                 self.stage_thread_dict[stage_num] = threading.Thread(target=thread_func_factory,
                                                                      args=(stage_num, ))
             else:
@@ -64,12 +82,14 @@ class pipeline_coordinator:
                             time.sleep(0.001)
                             continue
                         else:
-                            input_dict = input_buffer.pop(-1)
+                            start_cp = time.time()
                             if self.stall_policy == 'drop':
                                 # Keep only the latest data
+                                input_dict = input_buffer.pop(-1)
                                 self.stage_dataflow_buffer[k - 1]['data'] = []
-                            elif self.stall_policy == 'keep_all':
-                                self.stage_dataflow_buffer[k - 1]['data'] = input_buffer[:-1]
+                            elif self.stall_policy == 'debug_keep_all':
+                                input_dict = input_buffer.pop(0)
+                                self.stage_dataflow_buffer[k - 1]['data'] = input_buffer
                             else:
                                 raise NotImplementedError
                             self.stage_dataflow_buffer[k - 1]['lock'].release()
@@ -97,11 +117,28 @@ class pipeline_coordinator:
                                 self.stage_dataflow_buffer[k]['lock'].acquire()
                                 self.stage_dataflow_buffer[k]['data'].append(output_dict)
                                 self.stage_dataflow_buffer[k]['lock'].release()
+                            end_cp = time.time()
+                            self.record_time(k, end_cp - start_cp)
                 self.stage_thread_dict[stage_num] = threading.Thread(target=thread_func_factory,
                                                              args=(stage_num, ))
 
     def start(self):
         for k in sorted(list(self.stage_thread_dict.keys())):
             self.stage_thread_dict[k].start()
-        while True:
-            time.sleep(0.1)  # sleep forever
+        try:
+            while True:
+                time.sleep(0.1)  # sleep forever
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt received, exiting...")
+            print("Stage\tTotal\tCalls\tMin\tMax\tAvg")
+            for k in sorted(list(self.tic_tac_dict.keys())):
+                print("{}\t{:.3f}\t{}\t{:.3f}\t{:.3f}\t{:.3f}".format(
+                    k,
+                    self.tic_tac_dict[k]['total_time'],
+                    self.tic_tac_dict[k]['total_calls'],
+                    self.tic_tac_dict[k]['min_time'],
+                    self.tic_tac_dict[k]['max_time'],
+                    self.tic_tac_dict[k]['total_time'] / self.tic_tac_dict[k]['total_calls'],
+                ))
+            print("Exiting...")
+            exit(0)
