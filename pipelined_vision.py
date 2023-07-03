@@ -51,12 +51,14 @@ def main():
             'resized_bgr_frame'],
     )
 
-    main_pipeline.register_pipeline(stage=2,
-                                    func=model.detect,
-                                    name='YOLO Detection',
-                                    input_list=['resized_bgr_frame'],
-                                    output_list=['pred'],
-                                    )
+    main_pipeline.register_pipeline(
+        stage=2,
+        func=model.detect,
+        name='YOLO Detection',
+        input_list=['resized_bgr_frame'],
+        output_list=[
+            'pred'],
+    )
 
     main_pipeline.register_pipeline(
         stage=3,

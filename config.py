@@ -49,6 +49,9 @@ PACK_END = b'ED'
 
 # ========== DEBUGGING ==========
 
-DEBUG_DISPLAY = True
+DEBUG_DISPLAY = False
 DEBUG_PRINT = False
 DEFAULT_ENEMY_TEAM = 'red'
+
+# ========== Recording ==========
+LOGGING_FOLDER = "logs"
