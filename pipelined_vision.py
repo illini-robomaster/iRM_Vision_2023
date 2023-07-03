@@ -20,6 +20,8 @@ def main():
     model = two_stage_yolo_detector(config, config.DEFAULT_ENEMY_TEAM)
     aimer = Aim(config)
 
+    assert config.DEBUG_DISPLAY == False, "display not supported in pipelined_vision.py"
+
     communicator = UARTCommunicator(config)
     communicator.start_listening()
 
