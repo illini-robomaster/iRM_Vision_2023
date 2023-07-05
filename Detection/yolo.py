@@ -89,7 +89,6 @@ def non_max_suppression_export(
         output[xi] = x[i]
     return output
 
-
 class yolo_detector:
     """YOLO detector using ONNX backbone."""
 
@@ -160,6 +159,8 @@ class yolo_detector:
         else:
             raise NotImplementedError
 
+        self.image_padding_template = np.zeros((640,640,3), dtype=np.uint8) + 114
+
     def detect(self, rgb_img):
         """Detect armor in the input image.
 
@@ -171,11 +172,12 @@ class yolo_detector:
         """
         assert rgb_img.shape[:2] == (512, 640)
         img = self.pad_img(rgb_img)
-
         img = np.ascontiguousarray(img.transpose(2, 0, 1))  # to CHW
 
         img = img / 255.0
         img = img[None].astype(np.float32)
+        import time
+        start_cp = time.time()
 
         if HAS_TRT:
             outputs = self.trt_engine.run(img)
@@ -185,6 +187,9 @@ class yolo_detector:
             raw_pred = outputs[0]
         else:
             raise NotImplementedError
+
+        elapsed = time.time() - start_cp
+        print("[YOLO] inference time {:.8f}".format(elapsed))
 
         bbox_list = non_max_suppression_export(torch.tensor(raw_pred))
         assert len(bbox_list) == 1, 'input BS is 1'
@@ -213,6 +218,9 @@ class yolo_detector:
             np.array: padded image
         """
         # To generalize this function, see letterbox function in YOLOv7
+        if True:  # RMUL23
+            self.image_padding_template[64:576,:,:] = img
+            return self.image_padding_template
         assert img.shape[0] == self.H
         assert img.shape[1] == self.W
 
