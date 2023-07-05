@@ -123,7 +123,7 @@ class mdvs_camera(CameraBase):
                  FrameHead.iWidth,
                  1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
 
-            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_NEAREST)
             if self.cfg.ROTATE_180:
                 frame = cv2.rotate(frame, cv2.ROTATE_180)
             return frame
