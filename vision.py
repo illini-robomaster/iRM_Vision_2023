@@ -50,7 +50,7 @@ def main():
         ret_dict = aimer.process_one(pred, enemy_team, stm32_state_dict)
 
         if config.DEBUG_DISPLAY:
-            show_frame = aug_img_dict['raw_img'].copy()
+            show_frame = aug_img_dict['resized_img_bgr'].copy()
 
         if ret_dict:
             communicator.process_one_packet(

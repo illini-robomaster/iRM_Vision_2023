@@ -11,7 +11,8 @@ from Camera.simple_cv import simple_cv_camera
 AUTOAIM_CAMERA = fake_camera
 # AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
-EXPOSURE_TIME = 5
+EXPOSURE_TIME = 2  # in ms
+ANALOG_GAIN = 8.0
 
 # Compute some constants and define camera to use
 IMG_HEIGHT = 512
@@ -51,7 +52,7 @@ PACK_END = b'ED'
 
 # ========== DEBUGGING ==========
 
-DEBUG_DISPLAY = False
+DEBUG_DISPLAY = True
 DEBUG_PRINT = False
 DEFAULT_ENEMY_TEAM = 'red'
 

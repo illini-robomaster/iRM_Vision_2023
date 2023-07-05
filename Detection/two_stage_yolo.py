@@ -112,8 +112,6 @@ class two_stage_yolo_detector:
                                   (0, 255, 0),
                                   2,
                                   cv2.LINE_AA)
-            cv2.imshow('yolo', viz_img)
-            cv2.waitKey(1)
 
         pred_list = [pred for pred in pred_list if pred[5].startswith(self.target_color_prefix)]
 
@@ -122,9 +120,14 @@ class two_stage_yolo_detector:
         for min_x, min_y, max_x, max_y, conf, cls in pred_list:
             # TEST COLOR; INCLUDE ONLY ENEMY
             bbox = np.array([min_x, min_y, max_x, max_y])
-            roi_img = aug_img_dict['resized_img_rgb'][min_y:max_y, min_x:max_x]
+            if True:
+                assert aug_img_dict['raw_img'].shape[:2] == (self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2)
+                min_x *= 2
+                min_y *= 2
+                max_x *= 2
+                max_y *= 2
+            roi_img = aug_img_dict['raw_img'][min_y:max_y, min_x:max_x]
             gray_img = cv2.cvtColor(roi_img, cv2.COLOR_RGB2GRAY)
-            # TODO: use raw image to further increase PnP precision
             thres, binary_img = cv2.threshold(gray_img, 160, 255, cv2.THRESH_BINARY)
             bin_contours, _ = cv2.findContours(
                 binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -140,19 +143,16 @@ class two_stage_yolo_detector:
                 light = cv2.minAreaRect(contour)
                 light = light_class(light)
 
-                try:
-                    if not light.is_light():
-                        continue
-                except BaseException:
-                    import pdb
-                    pdb.set_trace()
+                if not light.is_light():
+                    continue
 
                 light.offset_bbox(min_x, min_y)
 
                 # TODO: add color tests?
+                light.scale_light(0.5)
                 light_list.append(light)
 
-            if len(light_list) < 2:
+            if len(light_list) != 2:
                 continue
 
             if light_list[0].center[0] < light_list[1].center[0]:
@@ -164,6 +164,16 @@ class two_stage_yolo_detector:
 
             armor = armor_class(left_light, right_light, bbox, conf, cls)
             armor_list.append(armor)
+        
+        if self.CFG.DEBUG_DISPLAY:
+            for armor in armor_list:
+                # visualize point in the light
+                viz_img = cv2.circle(viz_img, tuple(armor.left_light.top.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(viz_img, tuple(armor.left_light.btm.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(viz_img, tuple(armor.right_light.top.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(viz_img, tuple(armor.right_light.btm.astype(int)), 5, (0, 0, 255), -1)
+            cv2.imshow('YOLO', viz_img)
+            cv2.waitKey(1)
 
         return armor_list
 
@@ -230,6 +240,15 @@ class light_class:
         self.top += np.array([min_x, min_y])
         self.btm += np.array([min_x, min_y])
         self.center += np.array([min_x, min_y])
+    
+    def scale_light(self, scale_factor):
+        self.center_x *= scale_factor
+        self.center_y *= scale_factor
+        self.top *= scale_factor
+        self.btm *= scale_factor
+        self.center *= scale_factor
+        self.length *= scale_factor
+        self.width *= scale_factor
 
     def is_light(self):
         """Apply filtering to determine if a light bar is valid.
