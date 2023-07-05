@@ -253,8 +253,12 @@ class TensorRTBackendRep(BackendRep):
         if self.serialized_engine_path is not None:
             assert serialize_engine
         self._logger = TRT_LOGGER
+        # Fore more builder config options, see
+        # https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Core/Builder.html
         self.builder = trt.Builder(self._logger)
         self.config = self.builder.create_builder_config()
+        # For more config options, see
+        # https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Core/BuilderConfig.html
         self.int8_calibrator = int8_calibrator
         if self.builder.platform_has_fast_fp16:
             print("[iRM] FAST FP16 detected. Enabling precision to FP16...")
