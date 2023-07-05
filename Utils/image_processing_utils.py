@@ -6,7 +6,7 @@ import cv2
 IMAGE_PADDING_TEMPLATE = np.zeros((640,640,3), dtype=np.uint8) + 114
 IMAGE_PADDING_TEMPLATE = np.ascontiguousarray(IMAGE_PADDING_TEMPLATE)
 
-def preprocess_img(raw_img_bgr, cfg):
+def preprocess_img_step1(raw_img_bgr, cfg):
     """Pre-process image.
 
     Args:
@@ -28,6 +28,22 @@ def preprocess_img(raw_img_bgr, cfg):
     resized_img_rgb = resized_img_bgr[:, :, ::-1]
     ret_dict['resized_img_rgb'] = resized_img_rgb
 
+    return ret_dict
+
+def preprocess_img_step2(ret_dict, cfg):
+    """Pre-process image.
+
+    Args:
+        img (np.ndarray): BGR image
+        cfg (python object): shared config object
+    
+    TODO: this step is very expensive (~15ms on xavier NX). The transpose and division
+    should be done in ONNX with CUDA.
+
+    Returns:
+        np.ndarray: pre-processed BGR image
+    """
+    resized_img_rgb = ret_dict['resized_img_rgb']
     # YOLO padding
     assert resized_img_rgb.shape[:2] == (512, 640)
     IMAGE_PADDING_TEMPLATE[64:576,:,:] = resized_img_rgb
@@ -37,6 +53,7 @@ def preprocess_img(raw_img_bgr, cfg):
     img = img[None]
     ret_dict['processed_yolo_img_rgb'] = img
     return ret_dict
+
 
 def auto_align_brightness(img, target_v=50):
     """Standardize brightness of image.

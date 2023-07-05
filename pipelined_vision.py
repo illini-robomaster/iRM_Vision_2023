@@ -54,14 +54,22 @@ def main():
 
     main_pipeline.register_pipeline(
         stage=2,
-        func=partial(Utils.preprocess_img, cfg=config),
-        name='Preprocessing',
+        func=partial(Utils.preprocess_img_step1, cfg=config),
+        name='Preprocessing-step1',
         input_list=['raw_img_bgr'],
+        output_list=['ret_dict'],
+    )
+
+    main_pipeline.register_pipeline(
+        stage=2,
+        func=partial(Utils.preprocess_img_step1, cfg=config),
+        name='Preprocessing-step2',
+        input_list=['ret_dict'],
         output_list=['aug_img_dict'],
     )
 
     main_pipeline.register_pipeline(
-        stage=3,
+        stage=4,
         func=model.detect,
         name='YOLO Detection',
         input_list=['aug_img_dict'],
@@ -70,7 +78,7 @@ def main():
     )
 
     main_pipeline.register_pipeline(
-        stage=4,
+        stage=5,
         func=tracker_and_viz,
         name='Tracking and Visualization',
         input_list=[

@@ -35,7 +35,8 @@ def main():
         stm32_state_dict = communicator.get_current_stm32_state()
         frame = autoaim_camera.get_frame()
 
-        aug_img_dict = Utils.preprocess_img(frame, config)
+        tmp_dict = Utils.preprocess_img_step1(frame, config)
+        aug_img_dict = Utils.preprocess_img_step2(tmp_dict, config)
 
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
