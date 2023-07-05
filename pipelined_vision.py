@@ -61,8 +61,8 @@ def main():
     )
 
     main_pipeline.register_pipeline(
-        stage=2,
-        func=partial(Utils.preprocess_img_step1, cfg=config),
+        stage=3,
+        func=partial(Utils.preprocess_img_step2, cfg=config),
         name='Preprocessing-step2',
         input_list=['ret_dict'],
         output_list=['aug_img_dict'],
