@@ -28,7 +28,7 @@ def preprocess_img(raw_img_bgr, cfg):
     # YOLO padding
     assert resized_img_rgb.shape[:2] == (512, 640)
     IMAGE_PADDING_TEMPLATE[64:576,:,:] = resized_img_rgb
-    img = IMAGE_PADDING_TEMPLATE.transpose(2, 0, 1).astype(np.float32)  # to CHW
+    img = np.ascontiguousarray(IMAGE_PADDING_TEMPLATE.transpose(2, 0, 1)).astype(np.float32)  # to CHW
 
     img = img / 255.0
     img = img[None]
