@@ -76,6 +76,8 @@ class mdvs_camera(CameraBase):
         mvsdk.CameraSetAeState(self.cam, 0)
         mvsdk.CameraSetExposureTime(self.cam, self.exposure_time * 1000)
 
+        mvsdk.CameraSetAnalogGain(self.cam, self.analog_gain)
+
         # Calls SDK internal thread to start grabbing images
         # If in trigger mode, the image grabbing won't start until a trigger
         # frame is received

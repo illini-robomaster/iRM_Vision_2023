@@ -15,6 +15,7 @@ class CameraBase:
         self.width = self.cfg.IMG_WIDTH
         self.height = self.cfg.IMG_HEIGHT
         self.exposure_time = int(self.cfg.EXPOSURE_TIME)
+        self.analog_gain = int(self.cfg.ANALOG_GAIN)
 
     @abstractmethod
     def get_frame(self):
