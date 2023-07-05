@@ -5,7 +5,8 @@ from Aiming.Aim import Aim
 from Detection.two_stage_yolo import two_stage_yolo_detector
 from Communication.communicator import UARTCommunicator
 import config
-
+import Utils
+from functools import partial
 from Launcher.pipeline_coordinator import pipeline_coordinator
 
 
@@ -33,8 +34,8 @@ def main():
         frame = autoaim_camera.get_frame()
         return stm32_state_dict, enemy_team, frame
 
-    def tracker_and_viz(pred, enemy_team, resized_bgr_frame, stm32_state_dict):
-        ret_dict = aimer.process_one(pred, enemy_team, resized_bgr_frame, stm32_state_dict)
+    def tracker_and_viz(pred, enemy_team, stm32_state_dict):
+        ret_dict = aimer.process_one(pred, enemy_team, stm32_state_dict)
         if ret_dict:
             communicator.process_one_packet(
                 config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
@@ -48,26 +49,33 @@ def main():
         output_list=[
             'stm32_state_dict',
             'enemy_team',
-            'resized_bgr_frame'],
+            'raw_img_bgr'],
     )
 
     main_pipeline.register_pipeline(
         stage=2,
+        func=partial(Utils.preprocess_img, cfg=config),
+        name='Preprocessing',
+        input_list=['raw_img_bgr'],
+        output_list=['aug_img_dict'],
+    )
+
+    main_pipeline.register_pipeline(
+        stage=3,
         func=model.detect,
         name='YOLO Detection',
-        input_list=['resized_bgr_frame'],
+        input_list=['aug_img_dict'],
         output_list=[
             'pred'],
     )
 
     main_pipeline.register_pipeline(
-        stage=3,
+        stage=4,
         func=tracker_and_viz,
         name='Tracking and Visualization',
         input_list=[
             'pred',
             'enemy_team',
-            'resized_bgr_frame',
             'stm32_state_dict'],
     )
 

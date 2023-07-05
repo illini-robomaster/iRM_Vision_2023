@@ -75,7 +75,7 @@ class two_stage_yolo_detector:
         else:
             raise ValueError('Invalid color: ' + new_color)
 
-    def detect(self, resized_bgr_frame, raw_bgr_frame=None):
+    def detect(self, aug_img_dict):
         """Detect armors in the frame.
 
         Args:
@@ -85,17 +85,10 @@ class two_stage_yolo_detector:
         Returns:
             armor_list: list of armor_class objects
         """
-        if raw_bgr_frame is None:
-            raw_bgr_frame = resized_bgr_frame
-
-        # Use this trick than cvtColor gives insane speedup
-        # On 5950x, cvtColor takes 0.004s; this takes 1e-06s
-        resized_rgb_frame = resized_bgr_frame[:, :, ::-1]
-
         if self.CFG.DEBUG_DISPLAY:
-            viz_img = resized_bgr_frame.copy()
+            viz_img = aug_img_dict['resized_img_bgr'].copy()
 
-        pred_list = self.yolo.detect(resized_rgb_frame)
+        pred_list = self.yolo.detect(aug_img_dict['processed_yolo_img_rgb'])
 
         if self.CFG.DEBUG_DISPLAY:
             for min_x, min_y, max_x, max_y, conf, cls_name in pred_list:
@@ -129,7 +122,7 @@ class two_stage_yolo_detector:
         for min_x, min_y, max_x, max_y, conf, cls in pred_list:
             # TEST COLOR; INCLUDE ONLY ENEMY
             bbox = np.array([min_x, min_y, max_x, max_y])
-            roi_img = resized_rgb_frame[min_y:max_y, min_x:max_x]
+            roi_img = aug_img_dict['resized_img_rgb'][min_y:max_y, min_x:max_x]
             gray_img = cv2.cvtColor(roi_img, cv2.COLOR_RGB2GRAY)
             # TODO: use raw image to further increase PnP precision
             thres, binary_img = cv2.threshold(gray_img, 160, 255, cv2.THRESH_BINARY)

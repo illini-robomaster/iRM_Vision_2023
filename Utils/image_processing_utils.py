@@ -2,6 +2,38 @@
 import numpy as np
 import cv2
 
+# Consistent scratch memory
+IMAGE_PADDING_TEMPLATE = np.zeros((640,640,3), dtype=np.uint8) + 114
+IMAGE_PADDING_TEMPLATE = np.ascontiguousarray(IMAGE_PADDING_TEMPLATE)
+
+def preprocess_img(raw_img_bgr, cfg):
+    """Pre-process image.
+
+    Args:
+        img (np.ndarray): BGR image
+        cfg (python object): shared config object
+
+    Returns:
+        np.ndarray: pre-processed BGR image
+    """
+    ret_dict = {}
+    if cfg.ROTATE_180:
+        raw_img_bgr = cv2.rotate(raw_img_bgr, cv2.ROTATE_180)
+    resized_img_bgr = cv2.resize(raw_img_bgr, (cfg.IMG_WIDTH, cfg.IMG_HEIGHT), interpolation=cv2.INTER_NEAREST)
+    ret_dict['raw_img'] = raw_img_bgr
+    ret_dict['resized_img_bgr'] = resized_img_bgr
+    resized_img_rgb = resized_img_bgr[:, :, ::-1]
+    ret_dict['resized_img_rgb'] = resized_img_rgb
+
+    # YOLO padding
+    assert resized_img_rgb.shape[:2] == (512, 640)
+    IMAGE_PADDING_TEMPLATE[64:576,:,:] = resized_img_rgb
+    img = IMAGE_PADDING_TEMPLATE.transpose(2, 0, 1).astype(np.float32)  # to CHW
+
+    img = img / 255.0
+    img = img[None]
+    ret_dict['processed_yolo_img_rgb'] = img
+    return ret_dict
 
 def auto_align_brightness(img, target_v=50):
     """Standardize brightness of image.

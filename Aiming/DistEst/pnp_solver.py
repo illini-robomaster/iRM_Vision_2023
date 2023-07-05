@@ -31,7 +31,7 @@ class pnp_estimator:
             [65, 55 / 2, 0]
         ]).reshape((4, 3, 1)) / 1000.0
 
-    def estimate_position(self, armor, raw_rgb_image):
+    def estimate_position(self, armor):
         """Estimate the distance to the armor.
 
         Args:

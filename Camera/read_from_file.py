@@ -66,7 +66,9 @@ class fake_camera(CameraBase):
             print("FPS: {}".format(self.frame_cnt / (time.time() - self.timing)))
             raise Exception("Video file exhausted")
 
-        frame = cv2.resize(frame, (self.width, self.height))
+        if self.cfg.ROTATE_180:
+            # Simulate upside down camera
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
 
         self.frame_cnt += 1
 

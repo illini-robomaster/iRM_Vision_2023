@@ -159,9 +159,7 @@ class yolo_detector:
         else:
             raise NotImplementedError
 
-        self.image_padding_template = np.zeros((640,640,3), dtype=np.uint8) + 114
-
-    def detect(self, rgb_img):
+    def detect(self, yolo_img):
         """Detect armor in the input image.
 
         Args:
@@ -170,33 +168,21 @@ class yolo_detector:
         Returns:
             list: list of prediction tuples
         """
-        import time
-        start_cp = time.time()
-        assert rgb_img.shape[:2] == (512, 640)
-        img = self.pad_img(rgb_img)
-        elapsed = time.time() - start_cp
-        print("[YOLO] Padding time {:.8f}".format(elapsed))
-        start_cp = time.time()
-        img = np.ascontiguousarray(img.transpose(2, 0, 1)).astype(np.float32)  # to CHW
+        # assert rgb_img.shape[:2] == (512, 640)
+        # img = self.pad_img(rgb_img)
+        # img = np.ascontiguousarray(img.transpose(2, 0, 1)).astype(np.float32)  # to CHW
 
-        img = img / 255.0
-        img = img[None]
-        elapsed = time.time() - start_cp
-        print("[YOLO] Preprocess array transform time {:.8f}".format(elapsed))
-        start_cp = time.time()
+        # img = img / 255.0
+        # img = img[None]
 
         if HAS_TRT:
-            outputs = self.trt_engine.run(img)
+            outputs = self.trt_engine.run(yolo_img)
             raw_pred = outputs[3]
         elif HAS_ORT:
-            outputs = self.session.run(None, {"images": img})
+            outputs = self.session.run(None, {"images": yolo_img})
             raw_pred = outputs[0]
         else:
             raise NotImplementedError
-
-        elapsed = time.time() - start_cp
-        print("[YOLO] inference time {:.8f}".format(elapsed))
-        start_cp = time.time()
 
         bbox_list = non_max_suppression_export(torch.tensor(raw_pred))
         assert len(bbox_list) == 1, 'input BS is 1'
@@ -213,8 +199,6 @@ class yolo_detector:
 
             ret_list.append(ret_tuple)
 
-        elapsed = time.time() - start_cp
-        print("[YOLO] NMS time {:.8f}".format(elapsed))
         return ret_list
 
     def pad_img(self, img):

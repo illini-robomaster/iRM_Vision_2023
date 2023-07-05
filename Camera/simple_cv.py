@@ -35,5 +35,4 @@ class simple_cv_camera(CameraBase):
         ret, frame = self.cap.read()
         if not ret:
             raise
-        frame = cv2.resize(frame, (self.width, self.height))
         return frame
