@@ -18,8 +18,11 @@ def preprocess_img(raw_img_bgr, cfg):
     """
     ret_dict = {}
     if cfg.ROTATE_180:
-        raw_img_bgr = cv2.rotate(raw_img_bgr, cv2.ROTATE_180)
-    resized_img_bgr = cv2.resize(raw_img_bgr, (cfg.IMG_WIDTH, cfg.IMG_HEIGHT), interpolation=cv2.INTER_NEAREST)
+        raw_img_bgr = np.rot90(raw_img_bgr, 2)
+    assert cfg.IMG_WIDTH == raw_img_bgr.shape[1] // 2
+    assert cfg.IMG_HEIGHT == raw_img_bgr.shape[0] // 2
+    resized_img_bgr = raw_img_bgr[::2, ::2].copy()
+    # resized_img_bgr = cv2.resize(raw_img_bgr, (cfg.IMG_WIDTH, cfg.IMG_HEIGHT), interpolation=cv2.INTER_NEAREST)
     ret_dict['raw_img'] = raw_img_bgr
     ret_dict['resized_img_bgr'] = resized_img_bgr
     resized_img_rgb = resized_img_bgr[:, :, ::-1]
