@@ -37,6 +37,8 @@ K = np.array([
 
 # ========== Detection ==========
 YOLO_PATH = os.path.join(os.path.dirname(__file__), 'weights', 'shufflenet_no_nms.onnx')
+INT8_QUANTIZATION = True
+CALIB_IMG_DIR = 'calib_images'
 
 # ========== Trajectory Modeling ==========
 GRAVITY_CONSTANT = 9.81         # acceleration due to gravity

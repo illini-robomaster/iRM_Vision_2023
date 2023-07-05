@@ -1,6 +1,7 @@
 """YOLO detector using ONNX network."""
 import os
 import numpy as np
+from PIL import Image
 import cv2
 import torch
 import torchvision
@@ -88,7 +89,6 @@ def non_max_suppression_export(
         output[xi] = x[i]
     return output
 
-
 class yolo_detector:
     """YOLO detector using ONNX backbone."""
 
@@ -116,22 +116,8 @@ class yolo_detector:
         """
         self.CFG = cfg
         assert os.path.exists(self.CFG.YOLO_PATH), self.CFG.YOLO_PATH
-        if HAS_TRT:
-            serialized_engine_path = self.CFG.YOLO_PATH + '.trt'
-            self.trt_engine = TensorRTBackend.prepare(self.CFG.YOLO_PATH,
-                                                      device='CUDA:0',
-                                                      serialize_engine=True,
-                                                      verbose=False,
-                                                      serialized_engine_path=serialized_engine_path)
-        elif HAS_ORT:
-            if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
-                providers = ['CUDAExecutionProvider']
-            else:
-                providers = ['CPUExecutionProvider']
-            self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH, providers=providers)
-        else:
-            raise NotImplementedError
 
+        # ===== Populate preprocessing params =====
         self.H, self.W = self.CFG.IMG_HEIGHT, self.CFG.IMG_WIDTH
 
         target_shape = max(self.H, self.W), max(self.H, self.W)
@@ -145,11 +131,35 @@ class yolo_detector:
         assert self.target_W == 640
 
         self.dh = self.target_H - self.H
-        self.half_dh = self.dh // 2
+        self.half_dh = self.dh / 2
 
         self.padding_top, self.padding_btm = int(
             round(self.half_dh - 0.1)), int(round(self.half_dh + 0.1))
         self.padding_left, self.padding_right = 0, 0
+
+        # Prep inference backend
+        if HAS_TRT:  # TRT is generally faster than ORT. Thus higher priority.
+            if self.CFG.INT8_QUANTIZATION:
+                self.int8_calibrator = self._prep_int8_calibrator()
+            else:
+                self.int8_calibrator = None
+            serialized_engine_path = self.CFG.YOLO_PATH + '.trt'
+            self.trt_engine = TensorRTBackend.prepare(self.CFG.YOLO_PATH,
+                                                      device='CUDA:0',
+                                                      serialize_engine=True,
+                                                      verbose=False,
+                                                      serialized_engine_path=serialized_engine_path,
+                                                      int8_calibrator=self.int8_calibrator)
+        elif HAS_ORT:
+            if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+                providers = ['CUDAExecutionProvider']
+            else:
+                providers = ['CPUExecutionProvider']
+            self.session = onnxruntime.InferenceSession(self.CFG.YOLO_PATH, providers=providers)
+        else:
+            raise NotImplementedError
+
+        self.image_padding_template = np.zeros((640,640,3), dtype=np.uint8) + 114
 
     def detect(self, rgb_img):
         """Detect armor in the input image.
@@ -160,13 +170,20 @@ class yolo_detector:
         Returns:
             list: list of prediction tuples
         """
+        import time
+        start_cp = time.time()
         assert rgb_img.shape[:2] == (512, 640)
         img = self.pad_img(rgb_img)
-
-        img = np.ascontiguousarray(img.transpose(2, 0, 1))  # to CHW
+        elapsed = time.time() - start_cp
+        print("[YOLO] Padding time {:.8f}".format(elapsed))
+        start_cp = time.time()
+        img = np.ascontiguousarray(img.transpose(2, 0, 1)).astype(np.float32)  # to CHW
 
         img = img / 255.0
-        img = img[None].astype(np.float32)
+        img = img[None]
+        elapsed = time.time() - start_cp
+        print("[YOLO] Preprocess array transform time {:.8f}".format(elapsed))
+        start_cp = time.time()
 
         if HAS_TRT:
             outputs = self.trt_engine.run(img)
@@ -176,6 +193,10 @@ class yolo_detector:
             raw_pred = outputs[0]
         else:
             raise NotImplementedError
+
+        elapsed = time.time() - start_cp
+        print("[YOLO] inference time {:.8f}".format(elapsed))
+        start_cp = time.time()
 
         bbox_list = non_max_suppression_export(torch.tensor(raw_pred))
         assert len(bbox_list) == 1, 'input BS is 1'
@@ -192,6 +213,8 @@ class yolo_detector:
 
             ret_list.append(ret_tuple)
 
+        elapsed = time.time() - start_cp
+        print("[YOLO] NMS time {:.8f}".format(elapsed))
         return ret_list
 
     def pad_img(self, img):
@@ -204,6 +227,9 @@ class yolo_detector:
             np.array: padded image
         """
         # To generalize this function, see letterbox function in YOLOv7
+        if True:  # RMUL23
+            self.image_padding_template[64:576,:,:] = img
+            return self.image_padding_template
         assert img.shape[0] == self.H
         assert img.shape[1] == self.W
 
@@ -234,3 +260,67 @@ class yolo_detector:
         min_x -= self.padding_left
         max_x -= self.padding_left
         return min_x, min_y, max_x, max_y, conf, cls
+
+    def _prep_int8_calibrator(self):
+        # TODO: make this function flexible by supporting net_hw params
+        def prep_yolo_img_from_path(img_path, net_hw):
+            rgb_img = Image.open(img_path).convert('RGB')
+            rgb_img_np = np.array(rgb_img)
+
+            # ONNX height and width are 640
+            # Step 1: Resize longer edge to 640
+            H, W = rgb_img_np.shape[:2]
+
+            if H > W:
+                target_H = 640
+                target_W = int((target_H / H) * W)
+            else:
+                target_W = 640
+                target_H = int((target_W / W) * H)
+            
+            rgb_img = rgb_img.resize((target_W, target_H))
+            rgb_img_np = np.array(rgb_img)
+
+            # Step 2: Pad shorter edge to 640
+            H, W = rgb_img_np.shape[:2]
+
+            dh = 640 - H
+            half_dh = dh / 2
+
+            padding_top, padding_btm = int(round(half_dh - 0.1)), int(round(half_dh + 0.1))
+
+            dw = 640 - W
+            half_dw = dw / 2
+
+            padding_left, padding_right = int(round(half_dw - 0.1)), int(round(half_dw + 0.1))
+
+            DEFAULT_COLOR = (114, 114, 114)  # from YOLO official
+
+            rgb_img_np = cv2.copyMakeBorder(rgb_img_np,
+                                    padding_top,
+                                    padding_btm,
+                                    padding_left,
+                                    padding_right,
+                                    cv2.BORDER_CONSTANT,
+                                    value=DEFAULT_COLOR)
+
+            # Step 3: normalization
+            assert rgb_img_np.shape[:2] == (640, 640)
+
+            rgb_img_np = np.ascontiguousarray(rgb_img_np.transpose(2, 0, 1))  # to CHW
+
+            rgb_img_np = rgb_img_np.astype(np.float32) / 255.0
+
+            return rgb_img_np
+    
+        from .int8_calibrator import int8_calibrator
+
+        my_calibrator = int8_calibrator(
+            self.CFG.CALIB_IMG_DIR,
+            (640, 640),
+            self.CFG.YOLO_PATH + '.int8_calib_cache.bin',
+            prep_yolo_img_from_path,
+            1,
+        )
+
+        return my_calibrator
