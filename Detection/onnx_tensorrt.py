@@ -258,13 +258,12 @@ class TensorRTBackendRep(BackendRep):
         self.int8_calibrator = int8_calibrator
         if self.builder.platform_has_fast_fp16:
             print("[iRM] FAST FP16 detected. Enabling precision to FP16...")
-            self.serialized_engine_path.replace('.trt', '_fp16.trt')
+            self.serialized_engine_path = self.serialized_engine_path.replace('.trt', '_fp16.trt')
             self.config.set_flag(trt.BuilderFlag.FP16)
         # TODO(roger): enable INT8 requires post-training quantization and calibration
-        if self.builder.platform_has_fast_int8:
-            assert self.int8_calibrator is not None, "Calibrator must be specified for INT8"
+        if self.builder.platform_has_fast_int8 and self.int8_calibrator is not None:
             print("FAST INT8 detected. Enabling INT8...")
-            self.serialized_engine_path.replace('.trt', '_int8.trt')
+            self.serialized_engine_path = self.serialized_engine_path.replace('.trt', '_int8.trt')
             self.config.set_flag(trt.BuilderFlag.INT8)
             self.config.int8_calibrator = self.int8_calibrator
             # TODO: where should this go?
@@ -335,6 +334,7 @@ class TensorRTBackendRep(BackendRep):
                         this means we are building the engine at run time,
                         because we need to register optimization profiles for some inputs
         """
+        opt_profile = None
         if inputs:
             opt_profile = self.builder.create_optimization_profile()
             # Set optimization profiles for the input bindings that need them
@@ -355,6 +355,8 @@ class TensorRTBackendRep(BackendRep):
             self.config.add_optimization_profile(opt_profile)
         
         if self.int8_calibrator is not None:
+            if opt_profile is None:
+                opt_profile = self.builder.create_optimization_profile()
             self.config.set_calibration_profile(opt_profile)
 
         trt_engine = self.builder.build_engine(self.network, self.config)

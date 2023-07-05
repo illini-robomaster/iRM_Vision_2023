@@ -170,13 +170,19 @@ class yolo_detector:
         Returns:
             list: list of prediction tuples
         """
+        import time
+        start_cp = time.time()
         assert rgb_img.shape[:2] == (512, 640)
         img = self.pad_img(rgb_img)
-        img = np.ascontiguousarray(img.transpose(2, 0, 1))  # to CHW
+        elapsed = time.time() - start_cp
+        print("[YOLO] Padding time {:.8f}".format(elapsed))
+        start_cp = time.time()
+        img = np.ascontiguousarray(img.transpose(2, 0, 1)).astype(np.float32)  # to CHW
 
         img = img / 255.0
-        img = img[None].astype(np.float32)
-        import time
+        img = img[None]
+        elapsed = time.time() - start_cp
+        print("[YOLO] Preprocess array transform time {:.8f}".format(elapsed))
         start_cp = time.time()
 
         if HAS_TRT:
@@ -190,6 +196,7 @@ class yolo_detector:
 
         elapsed = time.time() - start_cp
         print("[YOLO] inference time {:.8f}".format(elapsed))
+        start_cp = time.time()
 
         bbox_list = non_max_suppression_export(torch.tensor(raw_pred))
         assert len(bbox_list) == 1, 'input BS is 1'
@@ -206,6 +213,8 @@ class yolo_detector:
 
             ret_list.append(ret_tuple)
 
+        elapsed = time.time() - start_cp
+        print("[YOLO] NMS time {:.8f}".format(elapsed))
         return ret_list
 
     def pad_img(self, img):
