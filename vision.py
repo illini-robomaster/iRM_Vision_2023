@@ -33,8 +33,8 @@ def main():
 
     while True:
         stm32_state_dict = communicator.get_current_stm32_state()
+        print(stm32_state_dict)
         frame = autoaim_camera.get_frame()
-
         tmp_dict = Utils.preprocess_img_step1(frame, config)
         aug_img_dict = Utils.preprocess_img_step2(tmp_dict, config)
 

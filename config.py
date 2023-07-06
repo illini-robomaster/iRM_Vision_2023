@@ -7,12 +7,12 @@ from Camera.read_from_file import fake_camera
 from Camera.simple_cv import simple_cv_camera
 # Define camera
 # from Camera.d455 import D455_camera
-# from Camera.mdvs import mdvs_camera
-AUTOAIM_CAMERA = fake_camera
-# AUTOAIM_CAMERA = mdvs_camera
+from Camera.mdvs import mdvs_camera
+#AUTOAIM_CAMERA = fake_camera
+AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
-EXPOSURE_TIME = 2  # in ms
-ANALOG_GAIN = 8.0
+EXPOSURE_TIME = 10  # in ms
+ANALOG_GAIN = 64  # Range seems to be 64-256; TODO: confirm from cam capability
 
 # Compute some constants and define camera to use
 IMG_HEIGHT = 512
@@ -52,7 +52,7 @@ PACK_END = b'ED'
 
 # ========== DEBUGGING ==========
 
-DEBUG_DISPLAY = True
+DEBUG_DISPLAY = False
 DEBUG_PRINT = False
 DEFAULT_ENEMY_TEAM = 'red'
 

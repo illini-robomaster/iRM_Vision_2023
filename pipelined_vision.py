@@ -40,7 +40,9 @@ def main():
             communicator.process_one_packet(
                 config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
 
-    main_pipeline = pipeline_coordinator(stall_policy='debug_keep_all')
+    my_recorder = Utils.split_video_recorder(config)
+
+    main_pipeline = pipeline_coordinator(stall_policy='drop')
 
     main_pipeline.register_pipeline(
         stage=1,
@@ -85,6 +87,13 @@ def main():
             'pred',
             'enemy_team',
             'stm32_state_dict'],
+    )
+
+    main_pipeline.register_pipeline(
+        stage=6,
+        func=my_recorder.process_one_frame,
+        name='recorder',
+        input_list=['raw_img_bgr'],
     )
 
     main_pipeline.parse_all_stage()

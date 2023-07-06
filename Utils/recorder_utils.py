@@ -29,7 +29,7 @@ class split_video_recorder:
         self.cur_video_writer = None
         self.cur_video_clip_idx = 0
 
-    def process_one_frame(self, resized_bgr_frame):
+    def process_one_frame(self, raw_img_bgr):
         """Process one frame.
 
         Args:
@@ -42,19 +42,19 @@ class split_video_recorder:
                 print("Not enough space left on disk. Idling...")
                 return
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_fn = os.path.join(self.cur_data_folder, "video_{}.mp4".format(cur_video_clip_idx))
+            video_fn = os.path.join(self.cur_data_folder, "video_{}.mp4".format(self.cur_video_clip_idx))
             # FIXME(roger): save raw videos
             self.cur_video_writer = cv2.VideoWriter(
-                video_fn, fourcc, 30, (self.CFG.IMG_WIDTH, self.CFG.IMG_HEIGHT))
+                video_fn, fourcc, 30, (self.CFG.IMG_WIDTH * 2, self.CFG.IMG_HEIGHT * 2))
             self.writer_start_time = time.time()
 
         assert self.cur_video_writer is not None
-        assert resized_bgr_frame is not None
-        assert resized_bgr_frame.shape == (self.CFG.IMG_HEIGHT, self.CFG.IMG_WIDTH, 3)
+        assert raw_img_bgr is not None
+        assert raw_img_bgr.shape == (self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2, 3)
 
-        self.cur_video_writer.write(resized_bgr_frame)
+        self.cur_video_writer.write(raw_img_bgr)
 
         if time.time() - self.writer_start_time > self.TIME_PER_CLIP:
             self.cur_video_writer.release()
             self.cur_video_writer = None
-            cur_video_clip_idx += 1
+            self.cur_video_clip_idx += 1
