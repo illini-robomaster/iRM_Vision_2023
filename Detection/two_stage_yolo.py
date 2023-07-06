@@ -119,6 +119,10 @@ class two_stage_yolo_detector:
 
         for min_x, min_y, max_x, max_y, conf, cls in pred_list:
             # TEST COLOR; INCLUDE ONLY ENEMY
+            min_x = max((0, min_x))
+            min_y = max((0, min_y))
+            max_x = min((self.CFG.IMG_WIDTH, max_x))
+            max_y = min((self.CFG.IMG_HEIGHT, max_y))
             bbox = np.array([min_x, min_y, max_x, max_y])
             if True:
                 assert aug_img_dict['raw_img'].shape[:2] == (self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2)
@@ -128,7 +132,7 @@ class two_stage_yolo_detector:
                 max_y *= 2
             roi_img = aug_img_dict['raw_img'][min_y:max_y, min_x:max_x]
             gray_img = cv2.cvtColor(roi_img, cv2.COLOR_RGB2GRAY)
-            thres, binary_img = cv2.threshold(gray_img, 160, 255, cv2.THRESH_BINARY)
+            thres, binary_img = cv2.threshold(gray_img, 80, 255, cv2.THRESH_BINARY)
             bin_contours, _ = cv2.findContours(
                 binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
