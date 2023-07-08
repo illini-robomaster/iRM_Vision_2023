@@ -72,13 +72,13 @@ class mdvs_camera(CameraBase):
         # Set camera trigger mode to continuous grab
         mvsdk.CameraSetTriggerMode(self.cam, 0)
 
-        # Set to manual exposure mode and set exposure time to 30ms
+        # Set to manual exposure mode and set exposure time
         mvsdk.CameraSetAeState(self.cam, 0)
-        mvsdk.CameraSetExposureTime(self.cam, self.exposure_time * 1000)
+        mvsdk.CameraSetExposureTime(self.cam, int(self.cfg.EXPOSURE_TIME * 1000))
 
-        mvsdk.CameraSetAnalogGain(self.cam, self.analog_gain)
+        mvsdk.CameraSetAnalogGain(self.cam, int(self.cfg.ANALOG_GAIN))
 
-        mvsdk.CameraSetGamma(self.cam, 100)  # default: 100
+        mvsdk.CameraSetGamma(self.cam, int(self.cfg.CAMERA_GAMMA))  # default: 100
 
         # Calls SDK internal thread to start grabbing images
         # If in trigger mode, the image grabbing won't start until a trigger
