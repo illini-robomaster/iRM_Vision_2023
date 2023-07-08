@@ -117,6 +117,11 @@ class two_stage_yolo_detector:
 
         armor_list = []
 
+        if self.CFG.DEBUG_DISPLAY:
+            thres, binary_img = cv2.threshold(cv2.cvtColor(aug_img_dict['raw_img'], cv2.COLOR_RGB2GRAY), 150, 255, cv2.THRESH_BINARY)
+            cv2.imshow('binarized_img', binary_img)
+            cv2.waitKey(1)
+
         for min_x, min_y, max_x, max_y, conf, cls in pred_list:
             # TEST COLOR; INCLUDE ONLY ENEMY
             min_x = max((0, min_x))
@@ -132,13 +137,14 @@ class two_stage_yolo_detector:
                 max_y *= 2
             roi_img = aug_img_dict['raw_img'][min_y:max_y, min_x:max_x]
             gray_img = cv2.cvtColor(roi_img, cv2.COLOR_RGB2GRAY)
-            thres, binary_img = cv2.threshold(gray_img, 80, 255, cv2.THRESH_BINARY)
+            thres, binary_img = cv2.threshold(gray_img, 150, 255, cv2.THRESH_BINARY)
             bin_contours, _ = cv2.findContours(
                 binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             bin_contours = [ctr for ctr in bin_contours if ctr.shape[0] >= 5]
 
             if len(bin_contours) < 2:
+                print("BBOX detected but ctr fewer than 2!")
                 continue
 
             light_list = []
@@ -157,6 +163,7 @@ class two_stage_yolo_detector:
                 light_list.append(light)
 
             if len(light_list) != 2:
+                print("Filtered light bar failed with {}".format(len(light_list)))
                 continue
 
             if light_list[0].center[0] < light_list[1].center[0]:
@@ -201,7 +208,7 @@ class light_class:
         tilt_angle (float): tilt angle of the light bar
     """
 
-    LIGHT_MIN_RATIO = 0.1
+    LIGHT_MIN_RATIO = 0.06
     LIGHT_MAX_RATIO = 0.55
     LIGHT_MAX_ANGLE = 40.0
 
