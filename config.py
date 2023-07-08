@@ -7,12 +7,13 @@ from Camera.read_from_file import fake_camera
 from Camera.simple_cv import simple_cv_camera
 # Define camera
 # from Camera.d455 import D455_camera
-from Camera.mdvs import mdvs_camera
-#AUTOAIM_CAMERA = fake_camera
-AUTOAIM_CAMERA = mdvs_camera
+#from Camera.mdvs import mdvs_camera
+AUTOAIM_CAMERA = fake_camera
+#AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
 EXPOSURE_TIME = 4  # in ms
 ANALOG_GAIN = 88  # Range seems to be 64-256; TODO: confirm from cam capability
+CAMERA_GAMMA = 100  # factory default is 100
 
 # Compute some constants and define camera to use
 IMG_HEIGHT = 512

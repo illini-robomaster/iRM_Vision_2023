@@ -144,7 +144,6 @@ class two_stage_yolo_detector:
             bin_contours = [ctr for ctr in bin_contours if ctr.shape[0] >= 5]
 
             if len(bin_contours) < 2:
-                print("BBOX detected but ctr fewer than 2!")
                 continue
 
             light_list = []
@@ -163,7 +162,6 @@ class two_stage_yolo_detector:
                 light_list.append(light)
 
             if len(light_list) != 2:
-                print("Filtered light bar failed with {}".format(len(light_list)))
                 continue
 
             if light_list[0].center[0] < light_list[1].center[0]:
