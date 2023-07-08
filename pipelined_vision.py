@@ -96,7 +96,9 @@ def main():
         stage=6,
         func=my_recorder.process_one_frame,
         name='recorder',
-        input_list=['raw_img_bgr'],
+        input_list=[
+            'raw_img_bgr',
+            'stm32_state_dict'],
     )
 
     main_pipeline.parse_all_stage()
