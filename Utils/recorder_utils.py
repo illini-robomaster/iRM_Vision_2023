@@ -49,10 +49,14 @@ class split_video_recorder:
             if cur_free_space < 0.5:  # 500 MB
                 print("Not enough space left on disk. Idling...")
                 return
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_fn = os.path.join(self.cur_data_folder, "video_{}.mp4".format(self.data_split_idx))
-            self.cur_video_writer = cv2.VideoWriter(
-                video_fn, fourcc, 30, (raw_img_bgr.shape[1], raw_img_bgr.shape[0]))
+            if True:
+                gst_out= "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=BGRx ! nvvidconv ! nvv4l2h264enc insert-vui=1 ! avimux ! filesink location={}".format(video_fn)
+                self.cur_video_writer = cv2.VideoWriter(gst_out, cv2.CAP_GSTREAMER, 0, 30, (raw_img_bgr.shape[1], raw_img_bgr.shape[0]))
+            else:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                self.cur_video_writer = cv2.VideoWriter(
+                    video_fn, fourcc, 30, (raw_img_bgr.shape[1], raw_img_bgr.shape[0]))
             self.dict_file_writer = open(
                 os.path.join(self.cur_data_folder, "video_{}.txt".format(self.data_split_idx)), 'w')
             self.writer_start_time = time.time()
