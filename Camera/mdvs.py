@@ -78,7 +78,7 @@ class mdvs_camera(CameraBase):
 
         mvsdk.CameraSetAnalogGain(self.cam, self.analog_gain)
 
-        mvsdk.CameraSetGamma(self.cam, 50)  # default: 100
+        mvsdk.CameraSetGamma(self.cam, 100)  # default: 100
 
         # Calls SDK internal thread to start grabbing images
         # If in trigger mode, the image grabbing won't start until a trigger
@@ -126,7 +126,6 @@ class mdvs_camera(CameraBase):
                 (FrameHead.iHeight,
                  FrameHead.iWidth,
                  1 if FrameHead.uiMediaType == mvsdk.CAMERA_MEDIA_TYPE_MONO8 else 3))
-
             return frame
         except mvsdk.CameraException as e:
             if e.error_code != mvsdk.CAMERA_STATUS_TIME_OUT:
