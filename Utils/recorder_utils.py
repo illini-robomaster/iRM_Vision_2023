@@ -48,14 +48,12 @@ class split_video_recorder:
                 return
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_fn = os.path.join(self.cur_data_folder, "video_{}.mp4".format(self.cur_video_clip_idx))
-            # FIXME(roger): save raw videos
             self.cur_video_writer = cv2.VideoWriter(
-                video_fn, fourcc, 30, (self.CFG.IMG_WIDTH * 2, self.CFG.IMG_HEIGHT * 2))
+                video_fn, fourcc, 30, (raw_img_bgr.shape[1], raw_img_bgr.shape[0]))
             self.writer_start_time = time.time()
 
         assert self.cur_video_writer is not None
         assert raw_img_bgr is not None
-        assert raw_img_bgr.shape == (self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2, 3)
 
         self.cur_video_writer.write(raw_img_bgr)
 
