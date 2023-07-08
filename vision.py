@@ -53,8 +53,11 @@ def main():
             show_frame = aug_img_dict['resized_img_bgr'].copy()
 
         if ret_dict:
-            communicator.process_one_packet(
-                config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
+            cur_time = time.time()
+            parsing_latency = cur_time - stm32_state_dict['timestamp']
+            if parsing_latency < 1:
+                communicator.process_one_packet(
+                    config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
             if config.DEBUG_DISPLAY:
                 # Reverse compute center_x and center_y from yaw angle
                 yaw_diff = ret_dict['abs_yaw'] - stm32_state_dict['cur_yaw']

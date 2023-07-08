@@ -1,5 +1,6 @@
 """Deployment main file with pipelining."""
 
+import time
 from Aiming.Aim import Aim
 # from Detection.YOLO import Yolo
 from Detection.two_stage_yolo import two_stage_yolo_detector
@@ -36,7 +37,9 @@ def main():
 
     def tracker_and_viz(pred, enemy_team, stm32_state_dict):
         ret_dict = aimer.process_one(pred, enemy_team, stm32_state_dict)
-        if ret_dict:
+        cur_time = time.time()
+        parsing_latency = cur_time - stm32_state_dict['timestamp']  # Detect serial failure
+        if ret_dict and parsing_latency < 1:  # 1 seconds
             communicator.process_one_packet(
                 config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
 
