@@ -7,6 +7,7 @@ import tensorrt as trt
 import pycuda.autoinit
 import pycuda.driver
 
+
 class int8_calibrator(trt.IInt8EntropyCalibrator2):
     """A generic INT8 calibratior for TRT.
 
@@ -77,10 +78,10 @@ class int8_calibrator(trt.IInt8EntropyCalibrator2):
 
     def read_calibration_cache(self):
         """Read calibration results from a cache file.
-        
+
         If there is a cache, use it instead of calibrating again.
         Otherwise, implicitly return None.
-        
+
         Function signature and return format defined by TRT here:
         https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Int8/EntropyCalibrator2.html
         """
@@ -90,7 +91,7 @@ class int8_calibrator(trt.IInt8EntropyCalibrator2):
 
     def write_calibration_cache(self, cache):
         """Write calib result to a cache file.
-        
+
         Defined by TRT in the same API docs in the above link in self.read_calibration_cache.
         """
         with open(self.cache_file, 'wb') as f:

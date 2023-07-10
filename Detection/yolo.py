@@ -89,6 +89,7 @@ def non_max_suppression_export(
         output[xi] = x[i]
     return output
 
+
 class yolo_detector:
     """YOLO detector using ONNX backbone."""
 
@@ -212,7 +213,7 @@ class yolo_detector:
         """
         # To generalize this function, see letterbox function in YOLOv7
         if True:  # RMUL23
-            self.image_padding_template[64:576,:,:] = img
+            self.image_padding_template[64:576, :, :] = img
             return self.image_padding_template
         assert img.shape[0] == self.H
         assert img.shape[1] == self.W
@@ -261,7 +262,7 @@ class yolo_detector:
             else:
                 target_W = 640
                 target_H = int((target_W / W) * H)
-            
+
             rgb_img = rgb_img.resize((target_W, target_H))
             rgb_img_np = np.array(rgb_img)
 
@@ -281,12 +282,12 @@ class yolo_detector:
             DEFAULT_COLOR = (114, 114, 114)  # from YOLO official
 
             rgb_img_np = cv2.copyMakeBorder(rgb_img_np,
-                                    padding_top,
-                                    padding_btm,
-                                    padding_left,
-                                    padding_right,
-                                    cv2.BORDER_CONSTANT,
-                                    value=DEFAULT_COLOR)
+                                            padding_top,
+                                            padding_btm,
+                                            padding_left,
+                                            padding_right,
+                                            cv2.BORDER_CONSTANT,
+                                            value=DEFAULT_COLOR)
 
             # Step 3: normalization
             assert rgb_img_np.shape[:2] == (640, 640)
@@ -296,7 +297,7 @@ class yolo_detector:
             rgb_img_np = rgb_img_np.astype(np.float32) / 255.0
 
             return rgb_img_np
-    
+
         from .int8_calibrator import int8_calibrator
 
         my_calibrator = int8_calibrator(

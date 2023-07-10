@@ -3,8 +3,9 @@ import numpy as np
 import cv2
 
 # Consistent scratch memory
-IMAGE_PADDING_TEMPLATE = np.zeros((640,640,3), dtype=np.uint8) + 114
+IMAGE_PADDING_TEMPLATE = np.zeros((640, 640, 3), dtype=np.uint8) + 114
 IMAGE_PADDING_TEMPLATE = np.ascontiguousarray(IMAGE_PADDING_TEMPLATE)
+
 
 def preprocess_img_step1(raw_img_bgr, cfg):
     """Pre-process image.
@@ -21,8 +22,9 @@ def preprocess_img_step1(raw_img_bgr, cfg):
         raw_img_bgr = np.rot90(raw_img_bgr, 2)
     assert cfg.IMG_WIDTH == raw_img_bgr.shape[1] // 2
     assert cfg.IMG_HEIGHT == raw_img_bgr.shape[0] // 2
+    # This trick downsamples the image by 2x
+    # It's significantly faster than general cv2.resize
     resized_img_bgr = raw_img_bgr[::2, ::2].copy()
-    # resized_img_bgr = cv2.resize(raw_img_bgr, (cfg.IMG_WIDTH, cfg.IMG_HEIGHT), interpolation=cv2.INTER_NEAREST)
     ret_dict['raw_img'] = raw_img_bgr
     ret_dict['resized_img_bgr'] = resized_img_bgr
     resized_img_rgb = resized_img_bgr[:, :, ::-1]
@@ -30,13 +32,14 @@ def preprocess_img_step1(raw_img_bgr, cfg):
 
     return ret_dict
 
+
 def preprocess_img_step2(ret_dict, cfg):
     """Pre-process image.
 
     Args:
         img (np.ndarray): BGR image
         cfg (python object): shared config object
-    
+
     TODO: this step is very expensive (~15ms on xavier NX). The transpose and division
     should be done in ONNX with CUDA.
 
@@ -46,8 +49,11 @@ def preprocess_img_step2(ret_dict, cfg):
     resized_img_rgb = ret_dict['resized_img_rgb']
     # YOLO padding
     assert resized_img_rgb.shape[:2] == (512, 640)
-    IMAGE_PADDING_TEMPLATE[64:576,:,:] = resized_img_rgb
-    img = np.ascontiguousarray(IMAGE_PADDING_TEMPLATE.transpose(2, 0, 1)).astype(np.float32)  # to CHW
+    IMAGE_PADDING_TEMPLATE[64:576, :, :] = resized_img_rgb
+    img = np.ascontiguousarray(
+        IMAGE_PADDING_TEMPLATE.transpose(
+            2, 0, 1)).astype(
+        np.float32)  # to CHW
 
     img = img / 255.0
     img = img[None]

@@ -118,7 +118,8 @@ class two_stage_yolo_detector:
         armor_list = []
 
         if self.CFG.DEBUG_DISPLAY:
-            thres, binary_img = cv2.threshold(cv2.cvtColor(aug_img_dict['raw_img'], cv2.COLOR_RGB2GRAY), 150, 255, cv2.THRESH_BINARY)
+            thres, binary_img = cv2.threshold(cv2.cvtColor(
+                aug_img_dict['raw_img'], cv2.COLOR_RGB2GRAY), 150, 255, cv2.THRESH_BINARY)
             cv2.imshow('binarized_img', binary_img)
             cv2.waitKey(1)
 
@@ -130,7 +131,8 @@ class two_stage_yolo_detector:
             max_y = min((self.CFG.IMG_HEIGHT, max_y))
             bbox = np.array([min_x, min_y, max_x, max_y])
             if True:
-                assert aug_img_dict['raw_img'].shape[:2] == (self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2)
+                assert aug_img_dict['raw_img'].shape[:2] == (
+                    self.CFG.IMG_HEIGHT * 2, self.CFG.IMG_WIDTH * 2)
                 min_x *= 2
                 min_y *= 2
                 max_x *= 2
@@ -173,14 +175,22 @@ class two_stage_yolo_detector:
 
             armor = armor_class(left_light, right_light, bbox, conf, cls)
             armor_list.append(armor)
-        
+
         if self.CFG.DEBUG_DISPLAY:
             for armor in armor_list:
                 # visualize point in the light
-                viz_img = cv2.circle(viz_img, tuple(armor.left_light.top.astype(int)), 5, (0, 0, 255), -1)
-                viz_img = cv2.circle(viz_img, tuple(armor.left_light.btm.astype(int)), 5, (0, 0, 255), -1)
-                viz_img = cv2.circle(viz_img, tuple(armor.right_light.top.astype(int)), 5, (0, 0, 255), -1)
-                viz_img = cv2.circle(viz_img, tuple(armor.right_light.btm.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(
+                    viz_img, tuple(
+                        armor.left_light.top.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(
+                    viz_img, tuple(
+                        armor.left_light.btm.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(
+                    viz_img, tuple(
+                        armor.right_light.top.astype(int)), 5, (0, 0, 255), -1)
+                viz_img = cv2.circle(
+                    viz_img, tuple(
+                        armor.right_light.btm.astype(int)), 5, (0, 0, 255), -1)
             cv2.imshow('YOLO', viz_img)
             cv2.waitKey(1)
 
@@ -249,8 +259,13 @@ class light_class:
         self.top += np.array([min_x, min_y])
         self.btm += np.array([min_x, min_y])
         self.center += np.array([min_x, min_y])
-    
+
     def scale_light(self, scale_factor):
+        """Scale the light bar by a factor to account for resizing.
+
+        Args:
+            scale_factor (float): scale factor
+        """
         self.center_x *= scale_factor
         self.center_y *= scale_factor
         self.top *= scale_factor

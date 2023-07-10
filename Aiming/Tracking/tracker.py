@@ -324,7 +324,7 @@ class tracker:
                                            za])
                 else:
                     # directly tracks armor
-                   target_pos = self.get_armor_position_from_state(ret)
+                    target_pos = self.get_armor_position_from_state(ret)
                 dist = np.sqrt(target_pos[0]**2 + target_pos[2]**2)
 
                 _, gimbal_pitch, gimbal_yaw = Utils.cartesian_to_spherical(*target_pos)

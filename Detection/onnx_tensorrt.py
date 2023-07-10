@@ -357,7 +357,7 @@ class TensorRTBackendRep(BackendRep):
                     opt_profile.set_shape(name, inputs[i].shape, inputs[i].shape, inputs[i].shape)
 
             self.config.add_optimization_profile(opt_profile)
-        
+
         if self.int8_calibrator is not None:
             if opt_profile is None:
                 opt_profile = self.builder.create_optimization_profile()
