@@ -7,7 +7,8 @@ import threading
 from copy import deepcopy
 
 # STM32 to Jetson packet size
-STJ_PACKET_SIZE = 18
+STJ_MAX_PACKET_SIZE = 21
+STJ_MIN_PACKET_SIZE = 10
 INT_FP_SCALE = 1e+6
 
 
@@ -19,7 +20,7 @@ class UARTCommunicator:
             cfg,
             crc_standard=crc.Crc8.MAXIM_DOW,
             endianness='little',
-            buffer_size=STJ_PACKET_SIZE * 100):
+            buffer_size=STJ_MAX_PACKET_SIZE * 100):
         """Initialize the UART communicator.
 
         Args:
@@ -44,6 +45,9 @@ class UARTCommunicator:
             'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
             'cur_yaw': 0,
             'cur_pitch': 0,
+            'vx': 0,
+            'vy': 0,
+            'vw': 0,
             'debug_int': 0}
 
         self.parsed_packet_cnt = 0
@@ -78,7 +82,7 @@ class UARTCommunicator:
 
     def try_read_one(self):
         """
-        Try to read one packet from the serial port and store to internal buffer.
+
 
         Returns:
             bool: True if a packet is read; False otherwise
@@ -158,12 +162,12 @@ class UARTCommunicator:
     def packet_search(self):
         """Parse internal circular buffer."""
         start_idx = 0
-        while start_idx <= len(self.circular_buffer) - STJ_PACKET_SIZE:
+        while start_idx <= len(self.circular_buffer) - STJ_MAX_PACKET_SIZE:
             header_letters = (
                 self.circular_buffer[start_idx], self.circular_buffer[start_idx + 1])
-            if header_letters == (ord('H'), ord('D')):
+            if header_letters == (ord('S'), ord('T')):
                 # Try to parse
-                possible_packet = self.circular_buffer[start_idx:start_idx + STJ_PACKET_SIZE]
+                possible_packet = self.circular_buffer[start_idx:start_idx + STJ_MAX_PACKET_SIZE]
                 ret_dict = self.try_parse_one(possible_packet)
                 if ret_dict is not None:
                     # Successfully parsed one
@@ -171,8 +175,11 @@ class UARTCommunicator:
                     self.state_dict_lock.acquire()
                     self.stm32_state_dict = ret_dict
                     self.state_dict_lock.release()
-                # Remove parsed bytes from the circular buffer
-                self.circular_buffer = self.circular_buffer[start_idx + STJ_PACKET_SIZE:]
+                    # Remove parsed bytes from the circular buffer
+                    self.circular_buffer = self.circular_buffer[start_idx + \
+                                              self.cfg.CMD_TO_LENGTH[ret_dict['cmd_id']]:]
+                else:
+                  self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
                 start_idx = 0
             else:
                 start_idx += 1
@@ -189,9 +196,9 @@ class UARTCommunicator:
         Returns:
             dict: a dictionary of parsed data; None if parsing failed
         """
-        assert len(possible_packet) == STJ_PACKET_SIZE
-        assert possible_packet[0] == ord('H')
-        assert possible_packet[1] == ord('D')
+        assert len(possible_packet) == STJ_MAX_PACKET_SIZE
+        assert possible_packet[0] == ord('S')
+        assert possible_packet[1] == ord('T')
 
         # Check packet end
         if possible_packet[-2] != ord('E') or possible_packet[-1] != ord('D'):
@@ -200,25 +207,40 @@ class UARTCommunicator:
         # Compute checksum
         crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:-3]))
         if crc_checksum != possible_packet[-3]:
+            print ("Packet received but crc checksum is wrong")
             return None
 
         # Valid packet
 
         # 0 for RED; 1 for BLUE
-        my_color_int = int(possible_packet[2])
+        #my_color_int = int(possible_packet[2])
 
-        cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
-        cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
-        debug_int = int.from_bytes(possible_packet[11:15], "little", signed=True)
+        #cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
+        #cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
+        #debug_int = int.from_bytes(possible_packet[11:15], "little", signed=True)
 
-        if my_color_int == 0:
-            my_color = 'red'
-            enemy_color = 'blue'
-        else:
-            my_color = 'blue'
-            enemy_color = 'red'
+        #if my_color_int == 0:
+        #    my_color = 'red'
+        #    enemy_color = 'blue'
+        #else:
+        #    my_color = 'blue'
+        #    enemy_color = 'red'
+
+        # temp dummy color for testing
+        my_color = 'blue'
+        enemy_color = 'red'
+        cur_yaw = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],\
+                       "little", signed=True) / INT_FP_SCALE
+        cur_pitch = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],\
+                       "little", signed=True) / INT_FP_SCALE
+        debug_int = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],\
+                       "little", signed=True)
+        cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
+
+        print(cur_yaw, cur_pitch, debug_int)
 
         return {
+            'cmd_id': cmd_id,
             'my_color': my_color,
             'enemy_color': enemy_color,
             'cur_yaw': cur_yaw,
@@ -252,7 +274,7 @@ class UARTCommunicator:
 
         Total     (17 bytes)
         """
-        assert header in [self.cfg.SEARCH_TARGET, self.cfg.MOVE_YOKE]
+        assert header in [self.cfg.PACK_START]
         packet = header
         assert isinstance(self.seq_num, int) and self.seq_num >= 0
         if self.seq_num >= 2 ** 32:
@@ -298,21 +320,18 @@ if __name__ == '__main__':
     uart = UARTCommunicator(config)
 
     if TESTING_CRC:
-        print("Starting packet sending test.")
-        for i in range(1000):
-            time.sleep(0.005)  # simulate 200Hz
-            uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
+        #print("Starting packet sending test.")
+        #for i in range(1000):
+        #    time.sleep(0.005)  # simulate 200Hz
+        #    uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
 
-        print("Packet sending test complete.")
-        print("You should see the light change from bllue to green on type C board.")
+        #print("Packet sending test complete.")
+        #print("You should see the light change from bllue to green on type C board.")
         print("Starting packet receiving test.")
 
         while True:
-            if uart.parsed_packet_cnt == 1000:
-                print("Receiver successfully parsed exactly 1000 packets.")
-                break
-            if uart.parsed_packet_cnt > 1000:
-                print("Repeatedly parsed one packet?")
+            if uart.parsed_packet_cnt == 10:
+                print("Receiver successfully parsed exactly 10 packets.")
                 break
             uart.try_read_one()
             uart.packet_search()
