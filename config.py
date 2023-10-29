@@ -37,8 +37,8 @@ CHASSIS_CMD_ID = 0x02
 
 # cmd_id to total packet length, unit: byte
 CMD_TO_LENGTH = {\
-              GIMBAL_CMD_ID:  10,  \
-              COLOR_CMD_ID:   21,  \
+              GIMBAL_CMD_ID:  21,  \
+              COLOR_CMD_ID:   10,  \
               CHASSIS_CMD_ID: 21,  \
 }
 

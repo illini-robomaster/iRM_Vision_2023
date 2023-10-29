@@ -173,7 +173,7 @@ class UARTCommunicator:
                     # Successfully parsed one
                     self.parsed_packet_cnt += 1
                     self.state_dict_lock.acquire()
-                    self.stm32_state_dict = ret_dict
+                    self.update_current_state(ret_dict)
                     self.state_dict_lock.release()
                     # Remove parsed bytes from the circular buffer
                     self.circular_buffer = self.circular_buffer[start_idx + \
@@ -183,6 +183,20 @@ class UARTCommunicator:
                 start_idx = 0
             else:
                 start_idx += 1
+
+    def update_current_state(self, ret_dict):
+      if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
+        self.stm32_state_dict['cur_yaw'] = ret_dict['data'][0]
+        self.stm32_state_dict['cur_pitch'] = ret_dict['data'][1]
+        self.stm32_state_dict['debug_int'] = ret_dict['data'][2]
+      elif ret_dict['cmd_id'] == self.cfg.COLOR_CMD_ID:
+        self.stm32_state_dict['my_color'] = ret_dict['data'][0]
+        self.stm32_state_dict['enemy_color'] = ret_dict['data'][1]
+      elif ret_dict['cmd_id'] == self.cfg.CHASSIS_CMD_ID:
+        self.stm32_state_dict['vx'] = ret_dict['data'][0]
+        self.stm32_state_dict['vy'] = ret_dict['data'][1]
+        self.stm32_state_dict['vw'] = ret_dict['data'][2]
+      print(self.stm32_state_dict)
 
     def try_parse_one(self, possible_packet):
         """
@@ -196,56 +210,57 @@ class UARTCommunicator:
         Returns:
             dict: a dictionary of parsed data; None if parsing failed
         """
-        assert len(possible_packet) == STJ_MAX_PACKET_SIZE
+        assert len(possible_packet) >= STJ_MIN_PACKET_SIZE
         assert possible_packet[0] == ord('S')
         assert possible_packet[1] == ord('T')
 
+        cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
+        packet_len = self.cfg.CMD_TO_LENGTH[cmd_id]
+
         # Check packet end
-        if possible_packet[-2] != ord('E') or possible_packet[-1] != ord('D'):
+        if possible_packet[packet_len-2] != ord('E') or possible_packet[packet_len-1] != ord('D'):
             return None
 
         # Compute checksum
-        crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:-3]))
-        if crc_checksum != possible_packet[-3]:
+        crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:packet_len-3]))
+        if crc_checksum != possible_packet[packet_len-3]:
             print ("Packet received but crc checksum is wrong")
             return None
 
-        # Valid packet
+        print ("possible packet with ID = " + str(cmd_id))
 
-        # 0 for RED; 1 for BLUE
-        #my_color_int = int(possible_packet[2])
+        data = None
 
-        #cur_yaw = int.from_bytes(possible_packet[3:7], "little", signed=True) / INT_FP_SCALE
-        #cur_pitch = int.from_bytes(possible_packet[7:11], "little", signed=True) / INT_FP_SCALE
-        #debug_int = int.from_bytes(possible_packet[11:15], "little", signed=True)
-
-        #if my_color_int == 0:
-        #    my_color = 'red'
-        #    enemy_color = 'blue'
-        #else:
-        #    my_color = 'blue'
-        #    enemy_color = 'red'
-
-        # temp dummy color for testing
-        my_color = 'blue'
-        enemy_color = 'red'
-        cur_yaw = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],\
-                       "little", signed=True) / INT_FP_SCALE
-        cur_pitch = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],\
-                       "little", signed=True) / INT_FP_SCALE
-        debug_int = int.from_bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],\
-                       "little", signed=True)
-        cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
-
-        print(cur_yaw, cur_pitch, debug_int)
+        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+          cur_yaw = int.from_bytes(possible_packet    \
+            [self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],"little", signed=True) / INT_FP_SCALE
+          cur_pitch = int.from_bytes(possible_packet  \
+            [self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],"little", signed=True) / INT_FP_SCALE
+          debug_int = int.from_bytes(possible_packet  \
+            [self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],"little", signed=True)
+          data = (cur_yaw, cur_pitch, debug_int)
+        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+          vx = int.from_bytes(possible_packet    \
+            [self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],"little", signed=True)
+          vy = int.from_bytes(possible_packet  \
+            [self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],"little", signed=True)
+          vw = int.from_bytes(possible_packet  \
+            [self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],"little", signed=True)
+          data = (vx, vy, vw)
+        elif (cmd_id == self.cfg.COLOR_CMD_ID):
+          # 0 for RED; 1 for BLUE
+          my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
+          if my_color_int == 0:
+              my_color = 'red'
+              enemy_color = 'blue'
+          else:
+              my_color = 'blue'
+              enemy_color = 'red'
+          data = (my_color, enemy_color)
 
         return {
             'cmd_id': cmd_id,
-            'my_color': my_color,
-            'enemy_color': enemy_color,
-            'cur_yaw': cur_yaw,
-            'cur_pitch': cur_pitch,
-            'debug_int': debug_int,
+            'data': data
         }
 
     def create_packet(self, header, yaw_offset, pitch_offset):
