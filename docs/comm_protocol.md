@@ -114,3 +114,15 @@ PACK_END (i.e., CRC is computed for the first (PACKET_LEN - 3) bytes up to end t
 ### PACK_END
 
 2 ASCII chars. This is the end of the packet denoted by ASCII characters 'ED'.
+
+## Checklist for adding new packet type:
+
+
+### For Vision repo:
+- In `communicator.py`, update `update_current_state()` and `try_parse_one()`
+- In `communicator.py`, update `STJ_MAX_PACKET_LENGTH` and `STJ_MIN_PACKET_LENGTH`
+- In `config.py`, update `CMD_TO_LENGTH[]`
+
+### For Embedded repo:
+- In `minipc_protocol.h`, update struct definition, CMD_TO_LENGTH, and `MAX_PACKET_LENGTH` and `MIN_PACKET_LENGTH`.
+- In `minipc_protocol.cc`, update `Pack()`

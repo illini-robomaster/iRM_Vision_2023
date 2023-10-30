@@ -39,6 +39,13 @@ CMD_TO_LENGTH = {\
               CHASSIS_CMD_ID: 21,  \
 }
 
+#0 for search target
+#1 for move yoke
+GIMBAL_MODE = [\
+'ST',\
+'MY',\
+]
+
 SEQNUM_OFFSET = 2
 DATA_LENGTH_OFFSET = SEQNUM_OFFSET + 2
 CMD_ID_OFFSET = DATA_LENGTH_OFFSET + 1

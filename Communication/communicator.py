@@ -233,19 +233,20 @@ class UARTCommunicator:
         if (cmd_id == self.cfg.GIMBAL_CMD_ID):
           # "<f" means little endian float
           rel_yaw = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))
+            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
           rel_pitch = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))
-          mode = int(possible_packet[self.cfg.DATA_OFFSET+8])
+            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
+          mode_int = int(possible_packet[self.cfg.DATA_OFFSET+8])
+          mode = self.cfg.GIMBAL_MODE[mode_int]
           debug_int = int(possible_packet[self.cfg.DATA_OFFSET+9])
           data = {'rel_yaw': rel_yaw, 'rel_pitch': rel_pitch, 'mode': mode, 'debug_int': debug_int}
         elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
           vx = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))
+            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
           vy = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))
+            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
           vw = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))
+            bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))[0]
           data = {'vx': vx, 'vy': vy, 'vw': vw}
         elif (cmd_id == self.cfg.COLOR_CMD_ID):
           # 0 for RED; 1 for BLUE
