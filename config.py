@@ -28,16 +28,13 @@ INITIAL_BULLET_SPEED = 15.0     # empirically measured
 PACK_START = b'ST'
 PACK_END = b'ED'
 
-# GIMBAL_CMD_ID: 0x00 Autoaim gimbal RelYaw RelPitch
-# COLOR_CMD_ID: 0x01
-# CHASSIS_CMD_ID: 0x02
 GIMBAL_CMD_ID = 0x00
 COLOR_CMD_ID = 0x01
 CHASSIS_CMD_ID = 0x02
 
 # cmd_id to total packet length, unit: byte
 CMD_TO_LENGTH = {\
-              GIMBAL_CMD_ID:  21,  \
+              GIMBAL_CMD_ID:  19,  \
               COLOR_CMD_ID:   10,  \
               CHASSIS_CMD_ID: 21,  \
 }

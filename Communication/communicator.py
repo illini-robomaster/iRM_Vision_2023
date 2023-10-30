@@ -4,6 +4,7 @@ import serial
 import crc
 import time
 import threading
+import struct
 from copy import deepcopy
 
 # STM32 to Jetson packet size
@@ -43,8 +44,8 @@ class UARTCommunicator:
         self.stm32_state_dict = {
             'my_color': 'red' if self.cfg.DEFAULT_ENEMY_TEAM == 'blue' else 'blue',
             'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
-            'cur_yaw': 0,
-            'cur_pitch': 0,
+            'rel_yaw': 0,
+            'rel_pitch': 0,
             'vx': 0,
             'vy': 0,
             'vw': 0,
@@ -186,17 +187,17 @@ class UARTCommunicator:
 
     def update_current_state(self, ret_dict):
       if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
-        self.stm32_state_dict['cur_yaw'] = ret_dict['data'][0]
-        self.stm32_state_dict['cur_pitch'] = ret_dict['data'][1]
-        self.stm32_state_dict['debug_int'] = ret_dict['data'][2]
+        self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
+        self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
+        self.stm32_state_dict['debug_int'] = ret_dict['data']['debug_int']
+        self.stm32_state_dict['mode'] = ret_dict['data']['mode']
       elif ret_dict['cmd_id'] == self.cfg.COLOR_CMD_ID:
-        self.stm32_state_dict['my_color'] = ret_dict['data'][0]
-        self.stm32_state_dict['enemy_color'] = ret_dict['data'][1]
+        self.stm32_state_dict['my_color'] = ret_dict['data']['my_color']
+        self.stm32_state_dict['enemy_color'] = ret_dict['data']['enemy_color']
       elif ret_dict['cmd_id'] == self.cfg.CHASSIS_CMD_ID:
-        self.stm32_state_dict['vx'] = ret_dict['data'][0]
-        self.stm32_state_dict['vy'] = ret_dict['data'][1]
-        self.stm32_state_dict['vw'] = ret_dict['data'][2]
-      print(self.stm32_state_dict)
+        self.stm32_state_dict['vx'] = ret_dict['data']['vx']
+        self.stm32_state_dict['vy'] = ret_dict['data']['vy']
+        self.stm32_state_dict['vw'] = ret_dict['data']['vw']
 
     def try_parse_one(self, possible_packet):
         """
@@ -227,26 +228,25 @@ class UARTCommunicator:
             print ("Packet received but crc checksum is wrong")
             return None
 
-        print ("possible packet with ID = " + str(cmd_id))
-
         data = None
 
         if (cmd_id == self.cfg.GIMBAL_CMD_ID):
-          cur_yaw = int.from_bytes(possible_packet    \
-            [self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],"little", signed=True) / INT_FP_SCALE
-          cur_pitch = int.from_bytes(possible_packet  \
-            [self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],"little", signed=True) / INT_FP_SCALE
-          debug_int = int.from_bytes(possible_packet  \
-            [self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],"little", signed=True)
-          data = (cur_yaw, cur_pitch, debug_int)
+          # "<f" means little endian float
+          rel_yaw = struct.unpack('<f',
+            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))
+          rel_pitch = struct.unpack('<f',
+            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))
+          mode = int(possible_packet[self.cfg.DATA_OFFSET+8])
+          debug_int = int(possible_packet[self.cfg.DATA_OFFSET+9])
+          data = {'rel_yaw': rel_yaw, 'rel_pitch': rel_pitch, 'mode': mode, 'debug_int': debug_int}
         elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
-          vx = int.from_bytes(possible_packet    \
-            [self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4],"little", signed=True)
-          vy = int.from_bytes(possible_packet  \
-            [self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8],"little", signed=True)
-          vw = int.from_bytes(possible_packet  \
-            [self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12],"little", signed=True)
-          data = (vx, vy, vw)
+          vx = struct.unpack('<f',
+            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))
+          vy = struct.unpack('<f',
+            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))
+          vw = struct.unpack('<f',
+            bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))
+          data = {'vx': vx, 'vy': vy, 'vw': vw}
         elif (cmd_id == self.cfg.COLOR_CMD_ID):
           # 0 for RED; 1 for BLUE
           my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
@@ -256,7 +256,7 @@ class UARTCommunicator:
           else:
               my_color = 'blue'
               enemy_color = 'red'
-          data = (my_color, enemy_color)
+          data = {'my_color': my_color, 'enemy_color': enemy_color}
 
         return {
             'cmd_id': cmd_id,
