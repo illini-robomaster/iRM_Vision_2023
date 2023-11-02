@@ -11,16 +11,16 @@ For implementation on the Jetson side, please refer to the main communicator [he
 
 ## Packet Struct
 
-| Name         | Content                            | Size          |
-|--------------|------------------------------------|---------------|
-| HEADER       | fixed 2 ASCII char ('ST')          | 2 bytes       |
-| SEQ_NUM      | uint16_t counter                   | 2 bytes       |
-| DATA_LEN     | uint8_t length of the data section | 1 byte        |
-| CMD_ID       | uint8_t identifier                 | 1 byte        |
-| DATA         | struct with fixed length           | 1 - 12 bytes  |
-| CRC_CHECKSUM | uint8_t checksum                   | 1 byte        |
-| TAIL         | fixed 2 ASCII char ('ED')          | 2 bytes       |
-| TOTAL        |                                    | 10 - 21 bytes |
+| Name         | Content                            | Size          | Offset         |
+|--------------|------------------------------------|---------------|----------------|
+| HEADER       | fixed 2 ASCII char ('ST')          | 2 bytes       | 0              |
+| SEQ_NUM      | uint16_t counter                   | 2 bytes       | 2              |
+| DATA_LEN     | uint8_t length of the data section | 1 byte        | 4              |
+| CMD_ID       | uint8_t identifier                 | 1 byte        | 5              |
+| DATA         | struct with fixed length           | 1 - 12 bytes  | 6              |
+| CRC_CHECKSUM | uint8_t checksum                   | 1 byte        | PACKET_LEN - 3 |
+| TAIL         | fixed 2 ASCII char ('ED')          | 2 bytes       | PACKET_LEN - 2 |
+| TOTAL        | /                                  | 10 - 21 bytes | /              |
 
 ## Detailed explanations
 
@@ -62,12 +62,12 @@ The followings are current data structs:
 
 #### gimbal_data_t
 
-| Name       | Content                    | Size    |
-|------------|----------------------------|---------|
-| rel_yaw    | float32, relative yaw      | 4 bytes |
-| rel_pitch  | float32, relative pitch    | 4 bytes |
-| mode       | uint8_t, autoaim mode      | 1 byte  |
-| debug_int  | uint8_t, debug int         | 1 byte  |
+| Name      | Content                 | Size    | Offset          |
+|-----------|-------------------------|---------|-----------------|
+| rel_yaw   | float32, relative yaw   | 4 bytes | DATA_OFFSET + 0 |
+| rel_pitch | float32, relative pitch | 4 bytes | DATA_OFFSET + 4 |
+| mode      | uint8_t, autoaim mode   | 1 byte  | DATA_OFFSET + 8 |
+| debug_int | uint8_t, debug int      | 1 byte  | DATA_OFFSET + 9 |
 
 **mode**: Different modes for autoaim. Current options are 'ST' (0) and 'MY' (1), which stands for "Search Target" and "Move Yoke".
 
@@ -87,9 +87,9 @@ The followings are current data structs:
 
 #### color_data_t
 
-| Name     | Content                    | Size   |
-|----------|----------------------------|--------|
-| my_color | uint8_t, color of our team | 1 byte |
+| Name     | Content                    | Size   | Offset          |
+|----------|----------------------------|--------|-----------------|
+| my_color | uint8_t, color of our team | 1 byte | DATA_OFFSET + 0 |
 
 **my_color**: RED is 0; BLUE is one
 
@@ -97,11 +97,11 @@ The followings are current data structs:
 
 #### chassis_data_t
 
-| Name | Content                                       | Size    |
-|------|-----------------------------------------------|---------|
-| vx   | float32, velocity to the front of the chassis | 4 bytes |
-| vy   | float32, velocity to the left of the chassis  | 4 bytes |
-| vw   | float32, counterclockwise angular velocity    | 4 bytes |
+| Name | Content                                       | Size    | Offset          |
+|------|-----------------------------------------------|---------|-----------------|
+| vx   | float32, velocity to the front of the chassis | 4 bytes | DATA_OFFSET + 0 |
+| vy   | float32, velocity to the left of the chassis  | 4 bytes | DATA_OFFSET + 4 |
+| vw   | float32, counterclockwise angular velocity    | 4 bytes | DATA_OFFSET + 8 |
 
 ---
 
@@ -115,13 +115,13 @@ PACK_END (i.e., CRC is computed for the first (PACKET_LEN - 3) bytes up to end t
 
 2 ASCII chars. This is the end of the packet denoted by ASCII characters 'ED'.
 
-## Checklist for adding new packet type:
+## Checklist: when adding a new packet type:
 
 
 ### For Vision repo:
-- In `communicator.py`, update `update_current_state()` and `try_parse_one()`
+- In `communicator.py`, update `update_current_state()` and `parse_data()`
 - In `communicator.py`, update `STJ_MAX_PACKET_LENGTH` and `STJ_MIN_PACKET_LENGTH`
-- In `config.py`, update `CMD_TO_LENGTH[]`
+- In `config.py`, update `CMD_TO_LENGTH[]` and add CMD_ID
 
 ### For Embedded repo:
 - In `minipc_protocol.h`, update struct definition, CMD_TO_LENGTH, and `MAX_PACKET_LENGTH` and `MIN_PACKET_LENGTH`.

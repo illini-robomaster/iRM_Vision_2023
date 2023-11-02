@@ -228,41 +228,48 @@ class UARTCommunicator:
             print ("Packet received but crc checksum is wrong")
             return None
 
-        data = None
-
-        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
-          # "<f" means little endian float
-          rel_yaw = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
-          rel_pitch = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
-          mode_int = int(possible_packet[self.cfg.DATA_OFFSET+8])
-          mode = self.cfg.GIMBAL_MODE[mode_int]
-          debug_int = int(possible_packet[self.cfg.DATA_OFFSET+9])
-          data = {'rel_yaw': rel_yaw, 'rel_pitch': rel_pitch, 'mode': mode, 'debug_int': debug_int}
-        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
-          vx = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
-          vy = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
-          vw = struct.unpack('<f',
-            bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))[0]
-          data = {'vx': vx, 'vy': vy, 'vw': vw}
-        elif (cmd_id == self.cfg.COLOR_CMD_ID):
-          # 0 for RED; 1 for BLUE
-          my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
-          if my_color_int == 0:
-              my_color = 'red'
-              enemy_color = 'blue'
-          else:
-              my_color = 'blue'
-              enemy_color = 'red'
-          data = {'my_color': my_color, 'enemy_color': enemy_color}
+        # Parse data into a dictionary
+        data = self.parse_data(possible_packet, cmd_id)
 
         return {
             'cmd_id': cmd_id,
             'data': data
         }
+
+    def parse_data(self, possible_packet, cmd_id):
+      data = None
+      # Parse Gimbal data, CMD_ID = 0x00
+      if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+        # "<f" means little endian float
+        rel_yaw = struct.unpack('<f',
+          bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
+        rel_pitch = struct.unpack('<f',
+          bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
+        mode_int = int(possible_packet[self.cfg.DATA_OFFSET+8])
+        mode = self.cfg.GIMBAL_MODE[mode_int]
+        debug_int = int(possible_packet[self.cfg.DATA_OFFSET+9])
+        data = {'rel_yaw': rel_yaw, 'rel_pitch': rel_pitch, 'mode': mode, 'debug_int': debug_int}
+      # Parse Chassis data, CMD_ID = 0x02
+      elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+        vx = struct.unpack('<f',
+          bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
+        vy = struct.unpack('<f',
+          bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
+        vw = struct.unpack('<f',
+          bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))[0]
+        data = {'vx': vx, 'vy': vy, 'vw': vw}
+      # Parse color data, CMD_ID = 0x01
+      elif (cmd_id == self.cfg.COLOR_CMD_ID):
+        # 0 for RED; 1 for BLUE
+        my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
+        if my_color_int == 0:
+            my_color = 'red'
+            enemy_color = 'blue'
+        else:
+            my_color = 'blue'
+            enemy_color = 'red'
+        data = {'my_color': my_color, 'enemy_color': enemy_color}
+      return data
 
     def create_packet(self, header, yaw_offset, pitch_offset):
         """
@@ -374,3 +381,4 @@ if __name__ == '__main__':
         # while True:
         #     time.sleep(0.005)
         #     uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)
+
