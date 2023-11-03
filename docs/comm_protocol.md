@@ -40,7 +40,7 @@ uint16_t counter. This is a counter that is incremented by 1 every time a packet
 
 ### DATA_LEN
 
-uint8_t length. The length of the data section (see below). Left here for future extension. Currently for all CMD_ID, the length of data is fixed and known. So this value is set to 0.
+uint8_t length. The length of the data section (see below). Note this is not the length of the entire packet! Left here for future extension. Currently for all CMD_ID, the length of data is fixed and known. So this value is set to 0.
 
 ### CMD_ID
 

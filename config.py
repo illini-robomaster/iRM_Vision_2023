@@ -32,13 +32,15 @@ GIMBAL_CMD_ID = 0x00
 COLOR_CMD_ID = 0x01
 CHASSIS_CMD_ID = 0x02
 
-# cmd_id to total packet length, unit: byte
+# mapping from cmd_id to data section length of the packet, unit: byte
 # packet length = data length + 9
-CMD_TO_LENGTH = {\
-              GIMBAL_CMD_ID:  19,  \
-              COLOR_CMD_ID:   10,  \
-              CHASSIS_CMD_ID: 21,  \
+CMD_TO_LEN = {\
+              GIMBAL_CMD_ID:  10,  \
+              COLOR_CMD_ID:   1,   \
+              CHASSIS_CMD_ID: 12,  \
 }
+# length of Header + Tail = 9 bytes
+HT_LEN = 9
 
 #0 for search target
 #1 for move yoke

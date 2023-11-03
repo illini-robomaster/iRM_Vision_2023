@@ -10,8 +10,6 @@ from copy import deepcopy
 # STM32 to Jetson packet size
 STJ_MAX_PACKET_SIZE = 21
 STJ_MIN_PACKET_SIZE = 10
-INT_FP_SCALE = 1e+6
-
 
 class UARTCommunicator:
     """USB-TTL-UART communicator for Jetson-STM32 communication."""
@@ -103,15 +101,25 @@ class UARTCommunicator:
             else:
                 return False
 
-    def process_one_packet(self, header, yaw_offset, pitch_offset):
+    def prepare_and_send_packet(self, cmd_id, data):
         """Process a batch of numbers into a CRC-checked packet and send it out.
 
         Args:
-            header (str): either 'ST' or 'MV'
-            yaw_offset (float): yaw offset in radians
-            pitch_offset (float): pitch offset in radians
+            cmd_id (int): see config.py
+            data (dict): all key and values are defined in the docs/comm_protocol.md
+            Here's a list of cmd_id's and their data for quick reference
+            For a more detailed description, see docs/comm_protocols.md
+            cmd_id == GIMBAL_CMD_ID:
+            data = {'rel_yaw': float, 'rel_pitch': float, 'mode': 'ST' or 'MY',
+                    'debug_int': uint8_t}
+
+            cmd_id == COLOR_CMD_ID:
+              data = {'my_color': 'red' or 'blue', 'enemy_color': same as my_color}
+
+            cmd_id == CHASSIS_CMD_ID:
+              data = {'vx': float, 'vy': float, 'vw': float}
         """
-        packet = self.create_packet(header, yaw_offset, pitch_offset)
+        packet = self.create_packet(cmd_id, data)
         self.send_packet(packet)
 
     def send_packet(self, packet):
@@ -178,7 +186,7 @@ class UARTCommunicator:
                     self.state_dict_lock.release()
                     # Remove parsed bytes from the circular buffer
                     self.circular_buffer = self.circular_buffer[start_idx + \
-                                              self.cfg.CMD_TO_LENGTH[ret_dict['cmd_id']]:]
+                                (self.cfg.CMD_TO_LEN[ret_dict['cmd_id']]+self.cfg.HT_LEN):]
                 else:
                   self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
                 start_idx = 0
@@ -216,7 +224,7 @@ class UARTCommunicator:
         assert possible_packet[1] == ord('T')
 
         cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
-        packet_len = self.cfg.CMD_TO_LENGTH[cmd_id]
+        packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN
 
         # Check packet end
         if possible_packet[packet_len-2] != ord('E') or possible_packet[packet_len-1] != ord('D'):
@@ -237,6 +245,16 @@ class UARTCommunicator:
         }
 
     def parse_data(self, possible_packet, cmd_id):
+        """
+        Helper function. Parse the data section of a possible packet.
+
+        For details on the struct of the packet, refer to docs/comm_protocol.md
+
+        Args:
+            data (map): keys are value types are defined in docs/comm_protocol
+        Returns:
+            dict: a dictionary of parsed data; None if parsing failed
+        """
       data = None
       # Parse Gimbal data, CMD_ID = 0x00
       if (cmd_id == self.cfg.GIMBAL_CMD_ID):
@@ -271,45 +289,39 @@ class UARTCommunicator:
         data = {'my_color': my_color, 'enemy_color': enemy_color}
       return data
 
-    def create_packet(self, header, yaw_offset, pitch_offset):
+    def create_packet(self, cmd_id, data):
         """
         Create CRC-checked packet from user input.
 
         Args:
-            header (str): either 'ST' or 'MV'
-            yaw_offset (float): yaw offset in radians
-            pitch_offset (float): pitch offset in radians
-
+            cmd_id (int): see config.py
+            data (dict): all key and values are defined in the docs/comm_protocol.md
         Returns:
             bytes: the packet to be sent to serial
 
         For more details, see doc/comms_protocol.md, but here is a summary of the packet format:
-
-        Big endian
+        Little endian
 
         HEADER    (2 bytes chars)
-        SEQNUM    (4 bytes uint32; wrap around)
-        REL_YAW   (4 bytes int32; radians * 1000000/1e+6)
-        REL_PITCH (4 bytes int32; radians * 1000000/1e+6)
+        SEQNUM    (2 bytes uint16; wrap around)
+        DATA_LEN  (2 bytes uint16)
+        CMD_ID    (1 byte  uint8)
+        DATA      (see docs/comms_protocol.md for details)
         CRC8      (1 byte  uint8; CRC checksum MAXIM_DOW of contents BEFORE CRC)
                   (i.e., CRC does not include itself and PACK_END!)
         PACK_END  (2 bytes chars)
-
-        Total     (17 bytes)
         """
-        assert header in [self.cfg.PACK_START]
-        packet = header
+        # Prepare header
+        packet = self.cfg.PACK_START
         assert isinstance(self.seq_num, int) and self.seq_num >= 0
-        if self.seq_num >= 2 ** 32:
-            self.seq_num = self.seq_num % (2 ** 32)
-        packet += (self.seq_num & 0xFFFFFFFF).to_bytes(4, self.endianness)
+        if self.seq_num >= 2 ** 16:
+            self.seq_num = self.seq_num % (2 ** 16)
+        packet += (self.seq_num & 0xFFFF).to_bytes(2, self.endianness)
+        packet += self.cfg.CMD_TO_LEN[cmd_id].to_bytes(1, self.endianness)
+        packet += cmd_id.to_bytes(1, self.endianness)
 
-        discrete_yaw_offset = int(yaw_offset * INT_FP_SCALE)
-        discrete_pitch_offset = int(pitch_offset * INT_FP_SCALE)
-
-        # TODO: add more sanity check here?
-        packet += (discrete_yaw_offset & 0xFFFFFFFF).to_bytes(4, self.endianness)
-        packet += (discrete_pitch_offset & 0xFFFFFFFF).to_bytes(4, self.endianness)
+        # Prepare data
+        packet += self.create_packet_data(cmd_id, data)
 
         # Compute CRC
         crc8_checksum = self.crc_calculator.checksum(packet)
@@ -321,8 +333,43 @@ class UARTCommunicator:
         packet += self.cfg.PACK_END
 
         self.seq_num += 1
-
         return packet
+    def create_packet_data(self, cmd_id, data):
+        """
+        Helper function. Create the data section for a packet
+        Args:
+            cmd_id (int): see config.py
+            data (dict): all key and values are defined in the docs/comm_protocol.md
+        Returns:
+            bytes: the data section of the packet to be sent to serial
+        """
+      # empty binary string
+      packet = b''
+      # Parse Gimbal data, CMD_ID = 0x00
+      if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+        # "<f" means little endian float
+        packet += struct.pack("<f", data['rel_yaw'])
+        packet += struct.pack("<f", data['rel_pitch'])
+        #0 for 'ST' 1 for 'MY',
+        packet += self.cfg.GIMBAL_MODE.index(data['mode']).to_bytes(1, self.endianness)
+        packet += data['debug_int'].to_bytes(1, self.endianness)
+      # Parse Chassis data, CMD_ID = 0x02
+      elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+        # "<f" means little endian float
+        packet += struct.pack("<f", data['vx'])
+        packet += struct.pack("<f", data['vy'])
+        packet += struct.pack("<f", data['vw'])
+      # Parse color data, CMD_ID = 0x01
+      elif (cmd_id == self.cfg.COLOR_CMD_ID):
+        # 0 for RED; 1 for BLUE
+        if data['my_color'] == 'red':
+          my_color_int = 0
+        elif data['my_color'] == 'blue':
+          my_color_int = 1
+        packet += my_color_int.to_bytes(1, self.endianness)
+      # Data length = Total length - 9
+      assert len(packet) == self.cfg.CMD_TO_LEN[cmd_id]
+      return packet
 
     def get_current_stm32_state(self):
         """Read from buffer from STM32 to Jetson and return the current state."""
@@ -346,7 +393,7 @@ if __name__ == '__main__':
         #print("Starting packet sending test.")
         #for i in range(1000):
         #    time.sleep(0.005)  # simulate 200Hz
-        #    uart.process_one_packet(config.SEARCH_TARGET, 0.0, 0.0)
+        #    uart.send_packet(config.SEARCH_TARGET, 0.0, 0.0)
 
         #print("Packet sending test complete.")
         #print("You should see the light change from bllue to green on type C board.")
@@ -363,22 +410,28 @@ if __name__ == '__main__':
         print(uart.get_current_stm32_state())
         print("Packet receiving test complete.")
     else:
-        cur_packet_cnt = uart.parsed_packet_cnt
-        cur_time = time.time()
-        prv_parsed_packet_cnt = 0
+        # packet receive test
+        #cur_packet_cnt = uart.parsed_packet_cnt
+        #cur_time = time.time()
+        #prv_parsed_packet_cnt = 0
+        #while True:
+        #    uart.try_read_one()
+        #    uart.packet_search()
+        #    if uart.parsed_packet_cnt > cur_packet_cnt:
+        #        cur_packet_cnt = uart.parsed_packet_cnt
+        #        # print(uart.get_current_stm32_state())
+        #    time.sleep(0.001)
+        #    if time.time() > cur_time + 1:
+        #        print("Parsed {} packets in 1 second.".format(
+        #            cur_packet_cnt - prv_parsed_packet_cnt))
+        #        prv_parsed_packet_cnt = cur_packet_cnt
+        #        cur_time = time.time()
+
+
+        cmd_id = uart.cfg.GIMBAL_CMD_ID
+        data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
         while True:
-            uart.try_read_one()
-            uart.packet_search()
-            if uart.parsed_packet_cnt > cur_packet_cnt:
-                cur_packet_cnt = uart.parsed_packet_cnt
-                # print(uart.get_current_stm32_state())
-            time.sleep(0.001)
-            if time.time() > cur_time + 1:
-                print("Parsed {} packets in 1 second.".format(
-                    cur_packet_cnt - prv_parsed_packet_cnt))
-                prv_parsed_packet_cnt = cur_packet_cnt
-                cur_time = time.time()
-        # while True:
-        #     time.sleep(0.005)
-        #     uart.process_one_packet(config.SEARCH_TARGET, 0.01, 0.0)
+            #time.sleep(0.005)
+            time.sleep(1)
+            uart.prepare_and_send_packet(cmd_id, data)
 
