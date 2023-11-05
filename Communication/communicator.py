@@ -44,10 +44,12 @@ class UARTCommunicator:
             'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
             'rel_yaw': 0,
             'rel_pitch': 0,
+            'debug_int': 0,
+            'mode': 'ST',
             'vx': 0,
             'vy': 0,
             'vw': 0,
-            'debug_int': 0}
+            }
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -80,11 +82,10 @@ class UARTCommunicator:
         return self.serial_port is not None
 
     def try_read_one(self):
-        """
-
+        """Try to copy from serial port to a circular buffer
 
         Returns:
-            bool: True if a packet is read; False otherwise
+            bool: True if there are data waiting in the serial port
         """
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
@@ -101,7 +102,7 @@ class UARTCommunicator:
             else:
                 return False
 
-    def prepare_and_send_packet(self, cmd_id, data):
+    def create_and_send_packet(self, cmd_id, data):
         """Process a batch of numbers into a CRC-checked packet and send it out.
 
         Args:
@@ -169,8 +170,12 @@ class UARTCommunicator:
         return serial_port
 
     def packet_search(self):
-        """Parse internal circular buffer."""
+        """Parse internal circular buffer.
+
+        Returns: True if a valid packet is found
+        """
         start_idx = 0
+        packet_found = False
         while start_idx <= len(self.circular_buffer) - STJ_MAX_PACKET_SIZE:
             header_letters = (
                 self.circular_buffer[start_idx], self.circular_buffer[start_idx + 1])
@@ -187,11 +192,13 @@ class UARTCommunicator:
                     # Remove parsed bytes from the circular buffer
                     self.circular_buffer = self.circular_buffer[start_idx + \
                                 (self.cfg.CMD_TO_LEN[ret_dict['cmd_id']]+self.cfg.HT_LEN):]
+                    packet_found = True
                 else:
                   self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
                 start_idx = 0
             else:
                 start_idx += 1
+        return packet_found
 
     def update_current_state(self, ret_dict):
       if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
@@ -245,16 +252,16 @@ class UARTCommunicator:
         }
 
     def parse_data(self, possible_packet, cmd_id):
-        """
-        Helper function. Parse the data section of a possible packet.
+      """
+      Helper function. Parse the data section of a possible packet.
 
-        For details on the struct of the packet, refer to docs/comm_protocol.md
+      For details on the struct of the packet, refer to docs/comm_protocol.md
 
-        Args:
-            data (map): keys are value types are defined in docs/comm_protocol
-        Returns:
-            dict: a dictionary of parsed data; None if parsing failed
-        """
+      Args:
+          data (map): keys are value types are defined in docs/comm_protocol
+      Returns:
+          dict: a dictionary of parsed data; None if parsing failed
+      """
       data = None
       # Parse Gimbal data, CMD_ID = 0x00
       if (cmd_id == self.cfg.GIMBAL_CMD_ID):
@@ -335,14 +342,14 @@ class UARTCommunicator:
         self.seq_num += 1
         return packet
     def create_packet_data(self, cmd_id, data):
-        """
-        Helper function. Create the data section for a packet
-        Args:
-            cmd_id (int): see config.py
-            data (dict): all key and values are defined in the docs/comm_protocol.md
-        Returns:
-            bytes: the data section of the packet to be sent to serial
-        """
+      """
+      Helper function. Create the data section for a packet
+      Args:
+          cmd_id (int): see config.py
+          data (dict): all key and values are defined in the docs/comm_protocol.md
+      Returns:
+          bytes: the data section of the packet to be sent to serial
+      """
       # empty binary string
       packet = b''
       # Parse Gimbal data, CMD_ID = 0x00
@@ -419,7 +426,7 @@ if __name__ == '__main__':
         #    uart.packet_search()
         #    if uart.parsed_packet_cnt > cur_packet_cnt:
         #        cur_packet_cnt = uart.parsed_packet_cnt
-        #        # print(uart.get_current_stm32_state())
+        #        print(uart.get_current_stm32_state())
         #    time.sleep(0.001)
         #    if time.time() > cur_time + 1:
         #        print("Parsed {} packets in 1 second.".format(
@@ -427,11 +434,20 @@ if __name__ == '__main__':
         #        prv_parsed_packet_cnt = cur_packet_cnt
         #        cur_time = time.time()
 
-
+        i = 0
         cmd_id = uart.cfg.GIMBAL_CMD_ID
         data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
         while True:
-            #time.sleep(0.005)
-            time.sleep(1)
-            uart.prepare_and_send_packet(cmd_id, data)
-
+          #    time.sleep(1)
+          #print(uart.get_current_stm32_state())
+          #time.sleep(1)
+          uart.try_read_one()
+          if uart.packet_search() == True:
+            data = uart.get_current_stm32_state()
+            print("from stm32: " + str(data))
+          time.sleep(0.005)
+          i = i + 1
+          if i % 100 == 0:
+            print("about to send" + str(data))
+            uart.create_and_send_packet(cmd_id, data)
+            i = 0
