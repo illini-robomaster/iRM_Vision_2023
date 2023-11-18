@@ -387,7 +387,8 @@ class UARTCommunicator:
 
 
 if __name__ == '__main__':
-    TESTING_CRC = False
+    TESTING_TX_RX = False
+    TESTING_CRC = True
     # Testing example if run as main
     import sys
     import os
@@ -396,58 +397,67 @@ if __name__ == '__main__':
     import config
     uart = UARTCommunicator(config)
 
-    if TESTING_CRC:
-        #print("Starting packet sending test.")
-        #for i in range(1000):
-        #    time.sleep(0.005)  # simulate 200Hz
-        #    uart.send_packet(config.SEARCH_TARGET, 0.0, 0.0)
-
-        #print("Packet sending test complete.")
-        #print("You should see the light change from bllue to green on type C board.")
-        print("Starting packet receiving test.")
-
-        while True:
-            if uart.parsed_packet_cnt == 10:
-                print("Receiver successfully parsed exactly 10 packets.")
-                break
-            uart.try_read_one()
-            uart.packet_search()
-            time.sleep(0.001)
-
-        print(uart.get_current_stm32_state())
-        print("Packet receiving test complete.")
-    else:
-        # packet receive test
-        #cur_packet_cnt = uart.parsed_packet_cnt
-        #cur_time = time.time()
-        #prv_parsed_packet_cnt = 0
-        #while True:
-        #    uart.try_read_one()
-        #    uart.packet_search()
-        #    if uart.parsed_packet_cnt > cur_packet_cnt:
-        #        cur_packet_cnt = uart.parsed_packet_cnt
-        #        print(uart.get_current_stm32_state())
-        #    time.sleep(0.001)
-        #    if time.time() > cur_time + 1:
-        #        print("Parsed {} packets in 1 second.".format(
-        #            cur_packet_cnt - prv_parsed_packet_cnt))
-        #        prv_parsed_packet_cnt = cur_packet_cnt
-        #        cur_time = time.time()
-
+    # RX/TX test by youhy, flash example/minipc/test.cc
+    # receive packet from stm32, rel_pitch += 1 then immediately send back
+    if TESTING_TX_RX:
         i = 0
         cmd_id = uart.cfg.GIMBAL_CMD_ID
         data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
         while True:
-          #    time.sleep(1)
-          #print(uart.get_current_stm32_state())
-          #time.sleep(1)
           uart.try_read_one()
+          # update stm32 status from packet from stm32
           if uart.packet_search() == True:
             data = uart.get_current_stm32_state()
             print("from stm32: " + str(data))
           time.sleep(0.005)
           i = i + 1
+          # every 0.5 sec, send current status to stm32
           if i % 100 == 0:
             print("about to send" + str(data))
             uart.create_and_send_packet(cmd_id, data)
             i = 0
+    else:
+      # rate test by Roger, flash example/minipc/typeC.cc or typeA.cc
+      if TESTING_CRC:
+
+          print("Starting packet sending test.")
+          for i in range(1000):
+              time.sleep(0.005)  # simulate 200Hz
+              cmd_id = uart.cfg.GIMBAL_CMD_ID
+              data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
+              uart.create_and_send_packet(cmd_id, data)
+
+          print("Packet sending test complete.")
+          print("You should see the light change from bllue to green on type C board.")
+          print("Starting packet receiving test.")
+
+          while True:
+              if uart.parsed_packet_cnt == 1000:
+                  print("Receiver successfully parsed exactly 1000 packets.")
+                  break
+              if uart.parsed_packet_cnt > 1000:
+                  print("Repeatedly parsed one packet?")
+                  break
+              uart.try_read_one()
+              uart.packet_search()
+              time.sleep(0.001)
+
+          print(uart.get_current_stm32_state())
+          print("Packet receiving test complete.")
+      else:
+          cur_packet_cnt = uart.parsed_packet_cnt
+          cur_time = time.time()
+          prv_parsed_packet_cnt = 0
+          while True:
+              uart.try_read_one()
+              uart.packet_search()
+              if uart.parsed_packet_cnt > cur_packet_cnt:
+                  cur_packet_cnt = uart.parsed_packet_cnt
+                  # print(uart.get_current_stm32_state())
+              time.sleep(0.001)
+              if time.time() > cur_time + 1:
+                  print("Parsed {} packets in 1 second.".format(
+                      cur_packet_cnt - prv_parsed_packet_cnt))
+                  prv_parsed_packet_cnt = cur_packet_cnt
+                  cur_time = time.time()
+
