@@ -83,7 +83,7 @@ class UARTCommunicator:
         return self.serial_port is not None
 
     def try_read_one(self):
-        """Try to copy from serial port to a circular buffer
+        """Try to copy from serial port to a circular buffer.
 
         Returns:
             bool: True if there are data waiting in the serial port
@@ -202,6 +202,11 @@ class UARTCommunicator:
         return packet_found
 
     def update_current_state(self, ret_dict):
+        """
+        Update stm32 state dict.
+
+        Helper function.
+        """
         if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
             self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
             self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
@@ -256,9 +261,9 @@ class UARTCommunicator:
 
     def parse_data(self, possible_packet, cmd_id):
         """
-        Helper function. Parse the data section of a possible packet.
+        Parse the data section of a possible packet.
 
-        For details on the struct of the packet, refer to docs/comm_protocol.md
+        Helper function for details on the struct of the packet, refer to docs/comm_protocol.md
 
         Args:
             data (map): keys are value types are defined in docs/comm_protocol
@@ -351,7 +356,9 @@ class UARTCommunicator:
 
     def create_packet_data(self, cmd_id, data):
         """
-        Helper function. Create the data section for a packet
+        Create the data section for a packet.
+
+        Helper function.
         Args:
             cmd_id (int): see config.py
             data (dict): all key and values are defined in the docs/comm_protocol.md
