@@ -11,6 +11,7 @@ from copy import deepcopy
 STJ_MAX_PACKET_SIZE = 21
 STJ_MIN_PACKET_SIZE = 10
 
+
 class UARTCommunicator:
     """USB-TTL-UART communicator for Jetson-STM32 communication."""
 
@@ -49,7 +50,7 @@ class UARTCommunicator:
             'vx': 0,
             'vy': 0,
             'vw': 0,
-            }
+        }
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -190,29 +191,29 @@ class UARTCommunicator:
                     self.update_current_state(ret_dict)
                     self.state_dict_lock.release()
                     # Remove parsed bytes from the circular buffer
-                    self.circular_buffer = self.circular_buffer[start_idx + \
-                                (self.cfg.CMD_TO_LEN[ret_dict['cmd_id']]+self.cfg.HT_LEN):]
+                    self.circular_buffer = self.circular_buffer[start_idx + (
+                        self.cfg.CMD_TO_LEN[ret_dict['cmd_id']] + self.cfg.HT_LEN):]
                     packet_found = True
                 else:
-                  self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
+                    self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
                 start_idx = 0
             else:
                 start_idx += 1
         return packet_found
 
     def update_current_state(self, ret_dict):
-      if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
-        self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
-        self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
-        self.stm32_state_dict['debug_int'] = ret_dict['data']['debug_int']
-        self.stm32_state_dict['mode'] = ret_dict['data']['mode']
-      elif ret_dict['cmd_id'] == self.cfg.COLOR_CMD_ID:
-        self.stm32_state_dict['my_color'] = ret_dict['data']['my_color']
-        self.stm32_state_dict['enemy_color'] = ret_dict['data']['enemy_color']
-      elif ret_dict['cmd_id'] == self.cfg.CHASSIS_CMD_ID:
-        self.stm32_state_dict['vx'] = ret_dict['data']['vx']
-        self.stm32_state_dict['vy'] = ret_dict['data']['vy']
-        self.stm32_state_dict['vw'] = ret_dict['data']['vw']
+        if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
+            self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
+            self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
+            self.stm32_state_dict['debug_int'] = ret_dict['data']['debug_int']
+            self.stm32_state_dict['mode'] = ret_dict['data']['mode']
+        elif ret_dict['cmd_id'] == self.cfg.COLOR_CMD_ID:
+            self.stm32_state_dict['my_color'] = ret_dict['data']['my_color']
+            self.stm32_state_dict['enemy_color'] = ret_dict['data']['enemy_color']
+        elif ret_dict['cmd_id'] == self.cfg.CHASSIS_CMD_ID:
+            self.stm32_state_dict['vx'] = ret_dict['data']['vx']
+            self.stm32_state_dict['vy'] = ret_dict['data']['vy']
+            self.stm32_state_dict['vw'] = ret_dict['data']['vw']
 
     def try_parse_one(self, possible_packet):
         """
@@ -234,13 +235,15 @@ class UARTCommunicator:
         packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN
 
         # Check packet end
-        if possible_packet[packet_len-2] != ord('E') or possible_packet[packet_len-1] != ord('D'):
+        if possible_packet[packet_len -
+                           2] != ord('E') or possible_packet[packet_len -
+                                                             1] != ord('D'):
             return None
 
         # Compute checksum
-        crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:packet_len-3]))
-        if crc_checksum != possible_packet[packet_len-3]:
-            print ("Packet received but crc checksum is wrong")
+        crc_checksum = self.crc_calculator.checksum(bytes(possible_packet[:packet_len - 3]))
+        if crc_checksum != possible_packet[packet_len - 3]:
+            print("Packet received but crc checksum is wrong")
             return None
 
         # Parse data into a dictionary
@@ -252,49 +255,53 @@ class UARTCommunicator:
         }
 
     def parse_data(self, possible_packet, cmd_id):
-      """
-      Helper function. Parse the data section of a possible packet.
+        """
+        Helper function. Parse the data section of a possible packet.
 
-      For details on the struct of the packet, refer to docs/comm_protocol.md
+        For details on the struct of the packet, refer to docs/comm_protocol.md
 
-      Args:
-          data (map): keys are value types are defined in docs/comm_protocol
-      Returns:
-          dict: a dictionary of parsed data; None if parsing failed
-      """
-      data = None
-      # Parse Gimbal data, CMD_ID = 0x00
-      if (cmd_id == self.cfg.GIMBAL_CMD_ID):
-        # "<f" means little endian float
-        rel_yaw = struct.unpack('<f',
-          bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
-        rel_pitch = struct.unpack('<f',
-          bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
-        mode_int = int(possible_packet[self.cfg.DATA_OFFSET+8])
-        mode = self.cfg.GIMBAL_MODE[mode_int]
-        debug_int = int(possible_packet[self.cfg.DATA_OFFSET+9])
-        data = {'rel_yaw': rel_yaw, 'rel_pitch': rel_pitch, 'mode': mode, 'debug_int': debug_int}
-      # Parse Chassis data, CMD_ID = 0x02
-      elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
-        vx = struct.unpack('<f',
-          bytes(possible_packet[self.cfg.DATA_OFFSET+0:self.cfg.DATA_OFFSET+4]))[0]
-        vy = struct.unpack('<f',
-          bytes(possible_packet[self.cfg.DATA_OFFSET+4:self.cfg.DATA_OFFSET+8]))[0]
-        vw = struct.unpack('<f',
-          bytes(possible_packet[self.cfg.DATA_OFFSET+8:self.cfg.DATA_OFFSET+12]))[0]
-        data = {'vx': vx, 'vy': vy, 'vw': vw}
-      # Parse color data, CMD_ID = 0x01
-      elif (cmd_id == self.cfg.COLOR_CMD_ID):
-        # 0 for RED; 1 for BLUE
-        my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
-        if my_color_int == 0:
-            my_color = 'red'
-            enemy_color = 'blue'
-        else:
-            my_color = 'blue'
-            enemy_color = 'red'
-        data = {'my_color': my_color, 'enemy_color': enemy_color}
-      return data
+        Args:
+            data (map): keys are value types are defined in docs/comm_protocol
+        Returns:
+            dict: a dictionary of parsed data; None if parsing failed
+        """
+        data = None
+        # Parse Gimbal data, CMD_ID = 0x00
+        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+            # "<f" means little endian float
+            rel_yaw = struct.unpack('<f', bytes(
+                possible_packet[self.cfg.DATA_OFFSET + 0:self.cfg.DATA_OFFSET + 4]))[0]
+            rel_pitch = struct.unpack('<f', bytes(
+                possible_packet[self.cfg.DATA_OFFSET + 4:self.cfg.DATA_OFFSET + 8]))[0]
+            mode_int = int(possible_packet[self.cfg.DATA_OFFSET + 8])
+            mode = self.cfg.GIMBAL_MODE[mode_int]
+            debug_int = int(possible_packet[self.cfg.DATA_OFFSET + 9])
+            data = {
+                'rel_yaw': rel_yaw,
+                'rel_pitch': rel_pitch,
+                'mode': mode,
+                'debug_int': debug_int}
+        # Parse Chassis data, CMD_ID = 0x02
+        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+            vx = struct.unpack('<f', bytes(
+                possible_packet[self.cfg.DATA_OFFSET + 0:self.cfg.DATA_OFFSET + 4]))[0]
+            vy = struct.unpack('<f', bytes(
+                possible_packet[self.cfg.DATA_OFFSET + 4:self.cfg.DATA_OFFSET + 8]))[0]
+            vw = struct.unpack('<f', bytes(
+                possible_packet[self.cfg.DATA_OFFSET + 8:self.cfg.DATA_OFFSET + 12]))[0]
+            data = {'vx': vx, 'vy': vy, 'vw': vw}
+        # Parse color data, CMD_ID = 0x01
+        elif (cmd_id == self.cfg.COLOR_CMD_ID):
+            # 0 for RED; 1 for BLUE
+            my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
+            if my_color_int == 0:
+                my_color = 'red'
+                enemy_color = 'blue'
+            else:
+                my_color = 'blue'
+                enemy_color = 'red'
+            data = {'my_color': my_color, 'enemy_color': enemy_color}
+        return data
 
     def create_packet(self, cmd_id, data):
         """
@@ -341,42 +348,43 @@ class UARTCommunicator:
 
         self.seq_num += 1
         return packet
+
     def create_packet_data(self, cmd_id, data):
-      """
-      Helper function. Create the data section for a packet
-      Args:
-          cmd_id (int): see config.py
-          data (dict): all key and values are defined in the docs/comm_protocol.md
-      Returns:
-          bytes: the data section of the packet to be sent to serial
-      """
-      # empty binary string
-      packet = b''
-      # Parse Gimbal data, CMD_ID = 0x00
-      if (cmd_id == self.cfg.GIMBAL_CMD_ID):
-        # "<f" means little endian float
-        packet += struct.pack("<f", data['rel_yaw'])
-        packet += struct.pack("<f", data['rel_pitch'])
-        #0 for 'ST' 1 for 'MY',
-        packet += self.cfg.GIMBAL_MODE.index(data['mode']).to_bytes(1, self.endianness)
-        packet += data['debug_int'].to_bytes(1, self.endianness)
-      # Parse Chassis data, CMD_ID = 0x02
-      elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
-        # "<f" means little endian float
-        packet += struct.pack("<f", data['vx'])
-        packet += struct.pack("<f", data['vy'])
-        packet += struct.pack("<f", data['vw'])
-      # Parse color data, CMD_ID = 0x01
-      elif (cmd_id == self.cfg.COLOR_CMD_ID):
-        # 0 for RED; 1 for BLUE
-        if data['my_color'] == 'red':
-          my_color_int = 0
-        elif data['my_color'] == 'blue':
-          my_color_int = 1
-        packet += my_color_int.to_bytes(1, self.endianness)
-      # Data length = Total length - 9
-      assert len(packet) == self.cfg.CMD_TO_LEN[cmd_id]
-      return packet
+        """
+        Helper function. Create the data section for a packet
+        Args:
+            cmd_id (int): see config.py
+            data (dict): all key and values are defined in the docs/comm_protocol.md
+        Returns:
+            bytes: the data section of the packet to be sent to serial
+        """
+        # empty binary string
+        packet = b''
+        # Parse Gimbal data, CMD_ID = 0x00
+        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+            # "<f" means little endian float
+            packet += struct.pack("<f", data['rel_yaw'])
+            packet += struct.pack("<f", data['rel_pitch'])
+            # 0 for 'ST' 1 for 'MY',
+            packet += self.cfg.GIMBAL_MODE.index(data['mode']).to_bytes(1, self.endianness)
+            packet += data['debug_int'].to_bytes(1, self.endianness)
+        # Parse Chassis data, CMD_ID = 0x02
+        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+            # "<f" means little endian float
+            packet += struct.pack("<f", data['vx'])
+            packet += struct.pack("<f", data['vy'])
+            packet += struct.pack("<f", data['vw'])
+        # Parse color data, CMD_ID = 0x01
+        elif (cmd_id == self.cfg.COLOR_CMD_ID):
+            # 0 for RED; 1 for BLUE
+            if data['my_color'] == 'red':
+                my_color_int = 0
+            elif data['my_color'] == 'blue':
+                my_color_int = 1
+            packet += my_color_int.to_bytes(1, self.endianness)
+        # Data length = Total length - 9
+        assert len(packet) == self.cfg.CMD_TO_LEN[cmd_id]
+        return packet
 
     def get_current_stm32_state(self):
         """Read from buffer from STM32 to Jetson and return the current state."""
@@ -404,60 +412,59 @@ if __name__ == '__main__':
         cmd_id = uart.cfg.GIMBAL_CMD_ID
         data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
         while True:
-          uart.try_read_one()
-          # update stm32 status from packet from stm32
-          if uart.packet_search() == True:
-            data = uart.get_current_stm32_state()
-            print("from stm32: " + str(data))
-          time.sleep(0.005)
-          i = i + 1
-          # every 0.5 sec, send current status to stm32
-          if i % 100 == 0:
-            print("about to send" + str(data))
-            uart.create_and_send_packet(cmd_id, data)
-            i = 0
+            uart.try_read_one()
+            # update stm32 status from packet from stm32
+            if uart.packet_search():
+                data = uart.get_current_stm32_state()
+                print("from stm32: " + str(data))
+            time.sleep(0.005)
+            i = i + 1
+            # every 0.5 sec, send current status to stm32
+            if i % 100 == 0:
+                print("about to send" + str(data))
+                uart.create_and_send_packet(cmd_id, data)
+                i = 0
     else:
-      # rate test by Roger, flash example/minipc/typeC.cc or typeA.cc
-      if TESTING_CRC:
+        # rate test by Roger, flash example/minipc/typeC.cc or typeA.cc
+        if TESTING_CRC:
 
-          print("Starting packet sending test.")
-          for i in range(1000):
-              time.sleep(0.005)  # simulate 200Hz
-              cmd_id = uart.cfg.GIMBAL_CMD_ID
-              data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
-              uart.create_and_send_packet(cmd_id, data)
+            print("Starting packet sending test.")
+            for i in range(1000):
+                time.sleep(0.005)  # simulate 200Hz
+                cmd_id = uart.cfg.GIMBAL_CMD_ID
+                data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
+                uart.create_and_send_packet(cmd_id, data)
 
-          print("Packet sending test complete.")
-          print("You should see the light change from bllue to green on type C board.")
-          print("Starting packet receiving test.")
+            print("Packet sending test complete.")
+            print("You should see the light change from bllue to green on type C board.")
+            print("Starting packet receiving test.")
 
-          while True:
-              if uart.parsed_packet_cnt == 1000:
-                  print("Receiver successfully parsed exactly 1000 packets.")
-                  break
-              if uart.parsed_packet_cnt > 1000:
-                  print("Repeatedly parsed one packet?")
-                  break
-              uart.try_read_one()
-              uart.packet_search()
-              time.sleep(0.001)
+            while True:
+                if uart.parsed_packet_cnt == 1000:
+                    print("Receiver successfully parsed exactly 1000 packets.")
+                    break
+                if uart.parsed_packet_cnt > 1000:
+                    print("Repeatedly parsed one packet?")
+                    break
+                uart.try_read_one()
+                uart.packet_search()
+                time.sleep(0.001)
 
-          print(uart.get_current_stm32_state())
-          print("Packet receiving test complete.")
-      else:
-          cur_packet_cnt = uart.parsed_packet_cnt
-          cur_time = time.time()
-          prv_parsed_packet_cnt = 0
-          while True:
-              uart.try_read_one()
-              uart.packet_search()
-              if uart.parsed_packet_cnt > cur_packet_cnt:
-                  cur_packet_cnt = uart.parsed_packet_cnt
-                  # print(uart.get_current_stm32_state())
-              time.sleep(0.001)
-              if time.time() > cur_time + 1:
-                  print("Parsed {} packets in 1 second.".format(
-                      cur_packet_cnt - prv_parsed_packet_cnt))
-                  prv_parsed_packet_cnt = cur_packet_cnt
-                  cur_time = time.time()
-
+            print(uart.get_current_stm32_state())
+            print("Packet receiving test complete.")
+        else:
+            cur_packet_cnt = uart.parsed_packet_cnt
+            cur_time = time.time()
+            prv_parsed_packet_cnt = 0
+            while True:
+                uart.try_read_one()
+                uart.packet_search()
+                if uart.parsed_packet_cnt > cur_packet_cnt:
+                    cur_packet_cnt = uart.parsed_packet_cnt
+                    # print(uart.get_current_stm32_state())
+                time.sleep(0.001)
+                if time.time() > cur_time + 1:
+                    print("Parsed {} packets in 1 second.".format(
+                        cur_packet_cnt - prv_parsed_packet_cnt))
+                    prv_parsed_packet_cnt = cur_packet_cnt
+                    cur_time = time.time()

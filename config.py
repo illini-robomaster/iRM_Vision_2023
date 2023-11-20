@@ -34,19 +34,19 @@ CHASSIS_CMD_ID = 0x02
 
 # mapping from cmd_id to data section length of the packet, unit: byte
 # packet length = data length + 9
-CMD_TO_LEN = {\
-              GIMBAL_CMD_ID:  10,  \
-              COLOR_CMD_ID:   1,   \
-              CHASSIS_CMD_ID: 12,  \
+CMD_TO_LEN = {
+    GIMBAL_CMD_ID: 10,
+    COLOR_CMD_ID: 1,
+    CHASSIS_CMD_ID: 12,
 }
 # length of Header + Tail = 9 bytes
 HT_LEN = 9
 
-#0 for search target
-#1 for move yoke
-GIMBAL_MODE = [\
-'ST',\
-'MY',\
+# 0 for search target
+# 1 for move yoke
+GIMBAL_MODE = [
+    'ST',
+    'MY',
 ]
 
 SEQNUM_OFFSET = 2
