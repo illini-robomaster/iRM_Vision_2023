@@ -412,7 +412,7 @@ if __name__ == '__main__':
     import config
     uart = UARTCommunicator(config)
 
-    # RX/TX test by youhy, flash example/minipc/test.cc
+    # RX/TX test by youhy, flash example/minipc/PingpongTest.cc
     # receive packet from stm32, rel_pitch += 1 then immediately send back
     if TESTING_TX_RX:
         i = 0
@@ -432,7 +432,7 @@ if __name__ == '__main__':
                 uart.create_and_send_packet(cmd_id, data)
                 i = 0
     else:
-        # rate test by Roger, flash example/minipc/typeC.cc or typeA.cc
+        # rate test by Roger, flash example/minipc/StressTestTypeC.cc or typeA.cc
         if TESTING_CRC:
 
             print("Starting packet sending test.")

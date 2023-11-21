@@ -9,6 +9,8 @@ For implementation on the Jetson side, please refer to the main communicator [he
 
 # Protocol between Jetson and STM32
 
+Note that the communication should always be single-sided (Otherwise we are reinventing TCP). A response should never **directly** depend on any data in previous packets. Example: send back `rel_pitch += 1` is an undefined behavior.
+
 ## Packet Struct
 
 | Name         | Content                            | Size          | Offset         |
