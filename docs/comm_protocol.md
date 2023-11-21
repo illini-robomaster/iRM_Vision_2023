@@ -128,6 +128,7 @@ PACK_END (i.e., CRC is computed for the first (PACKET_LEN - 3) bytes up to end t
 
 ### For Embedded repo:
 - In `minipc_protocol.h`, add new data struct definition
+- In `minipc_protocol.h`, change struct `status_data_t`
 - In `minipc_protocol.h`, updaete `enum CMD_ID` and `CMD_TO_LEN[]`
 - In `minipc_protocol.cc`, add data section packing to `Pack()` (you will need to add a helper function)
 - In `minipc_protocol.cc`, add data section parsing to `ParseData()`
