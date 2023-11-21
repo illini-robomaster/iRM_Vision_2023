@@ -19,7 +19,7 @@ Note that the communication should always be single-sided (Otherwise we are rein
 | SEQ_NUM      | uint16_t counter                   | 2 bytes       | 2              |
 | DATA_LEN     | uint8_t length of the data section | 1 byte        | 4              |
 | CMD_ID       | uint8_t identifier                 | 1 byte        | 5              |
-| DATA         | struct with fixed length           | 1 - 12 bytes  | 6              |
+| DATA         | struct with fixed length           | n bytes       | 6              |
 | CRC_CHECKSUM | uint8_t checksum                   | 1 byte        | PACKET_LEN - 3 |
 | TAIL         | fixed 2 ASCII char ('ED')          | 2 bytes       | PACKET_LEN - 2 |
 | TOTAL        | /                                  | 10 - 21 bytes | /              |
@@ -119,12 +119,16 @@ PACK_END (i.e., CRC is computed for the first (PACKET_LEN - 3) bytes up to end t
 
 ## Checklist: when adding a new packet type:
 
-
 ### For Vision repo:
+- In `communicator.py`, add data section packing to `create_packet_data()`
 - In `communicator.py`, update `update_current_state()` and `parse_data()`
-- In `communicator.py`, update `STJ_MAX_PACKET_LENGTH` and `STJ_MIN_PACKET_LENGTH`
-- In `config.py`, update `CMD_TO_LENGTH[]` and add CMD_ID
+- In `communicator.py`, change `self.stm32_state_dict{}` in `__init__()`
+- In `config.py`, add CMD_ID and update `CMD_TO_LEN[]`
+- (Optional) If new whole packet length (header + tail + data > STJ_MAX_PACKET_LENGTH or < STJ_MIN_PACKET_LENGTH), in `communicator.py`, update `STJ_MAX_PACKET_LENGTH` and `STJ_MIN_PACKET_LENGTH`.
 
 ### For Embedded repo:
-- In `minipc_protocol.h`, update struct definition, CMD_TO_LENGTH, and `MAX_PACKET_LENGTH` and `MIN_PACKET_LENGTH`.
-- In `minipc_protocol.cc`, update `Pack()`
+- In `minipc_protocol.h`, add new data struct definition
+- In `minipc_protocol.h`, updaete `enum CMD_ID` and `CMD_TO_LEN[]`
+- In `minipc_protocol.cc`, add data section packing to `Pack()` (you will need to add a helper function)
+- In `minipc_protocol.cc`, add data section parsing to `ParseData()`
+- (Optional) If new whole packet length (header + tail + data > MAX_PACKET_LENGTH or < MIN_PACKET_LENGTH), in `minipc_protocol.h`, update `MAX_PACKET_LENGTH` and `MIN_PACKET_LENGTH`.
