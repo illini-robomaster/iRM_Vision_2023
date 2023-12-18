@@ -90,7 +90,7 @@ class UARTCommunicator:
         """
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
-            if (self.serial_port.inWaiting() > 0):
+            if self.serial_port.inWaiting() > 0:
                 # read the bytes and convert from binary array to ASCII
                 byte_array = self.serial_port.read(self.serial_port.inWaiting())
 
@@ -180,7 +180,7 @@ class UARTCommunicator:
         while start_idx <= len(self.circular_buffer) - STJ_MAX_PACKET_SIZE:
             header_letters = (
                 self.circular_buffer[start_idx], self.circular_buffer[start_idx + 1])
-            if header_letters == (ord('S'), ord('T')):
+            if header_letters == (self.cfg.PACK_START[0], self.cfg.PACK_START[1]):
                 # Try to parse
                 possible_packet = self.circular_buffer[start_idx:start_idx + STJ_MAX_PACKET_SIZE]
                 ret_dict = self.try_parse_one(possible_packet)
@@ -195,7 +195,7 @@ class UARTCommunicator:
                         self.cfg.CMD_TO_LEN[ret_dict['cmd_id']] + self.cfg.HT_LEN):]
                     packet_found = True
                 else:
-                    self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
+                    self.circular_buffer = self.circular_buffer[start_idx + self.cfg.PACK_START:]
                 start_idx = 0
             else:
                 start_idx += 1
@@ -207,6 +207,8 @@ class UARTCommunicator:
 
         Helper function.
         """
+        # Dont do self.stm32_state_dict['data'] = ret_dict['data'] because different threads
+        # may need different information from the stm32
         if ret_dict['cmd_id'] == self.cfg.GIMBAL_CMD_ID:
             self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
             self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
@@ -233,16 +235,16 @@ class UARTCommunicator:
             dict: a dictionary of parsed data; None if parsing failed
         """
         assert len(possible_packet) >= STJ_MIN_PACKET_SIZE
-        assert possible_packet[0] == ord('S')
-        assert possible_packet[1] == ord('T')
+        assert possible_packet[0] == self.cfg.PACK_START[0]
+        assert possible_packet[1] == self.cfg.PACK_START[1]
 
         cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
         packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN
 
         # Check packet end
         if possible_packet[packet_len -
-                           2] != ord('E') or possible_packet[packet_len -
-                                                             1] != ord('D'):
+                           2] != self.cfg.PACK_END[0] or possible_packet[packet_len -
+                                                                         1] != self.cfg.PACK_END[1]:
             return None
 
         # Compute checksum
@@ -272,12 +274,12 @@ class UARTCommunicator:
         """
         data = None
         # Parse Gimbal data, CMD_ID = 0x00
-        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+        if cmd_id == self.cfg.GIMBAL_CMD_ID:
             # "<f" means little endian float
             rel_yaw = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 0:self.cfg.DATA_OFFSET + 4]))[0]
+                possible_packet[self.cfg.DATA_OFFSET + 0: self.cfg.DATA_OFFSET + 4]))[0]
             rel_pitch = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 4:self.cfg.DATA_OFFSET + 8]))[0]
+                possible_packet[self.cfg.DATA_OFFSET + 4: self.cfg.DATA_OFFSET + 8]))[0]
             mode_int = int(possible_packet[self.cfg.DATA_OFFSET + 8])
             mode = self.cfg.GIMBAL_MODE[mode_int]
             debug_int = int(possible_packet[self.cfg.DATA_OFFSET + 9])
@@ -287,16 +289,16 @@ class UARTCommunicator:
                 'mode': mode,
                 'debug_int': debug_int}
         # Parse Chassis data, CMD_ID = 0x02
-        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+        elif cmd_id == self.cfg.CHASSIS_CMD_ID:
             vx = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 0:self.cfg.DATA_OFFSET + 4]))[0]
+                possible_packet[self.cfg.DATA_OFFSET + 0: self.cfg.DATA_OFFSET + 4]))[0]
             vy = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 4:self.cfg.DATA_OFFSET + 8]))[0]
+                possible_packet[self.cfg.DATA_OFFSET + 4: self.cfg.DATA_OFFSET + 8]))[0]
             vw = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 8:self.cfg.DATA_OFFSET + 12]))[0]
+                possible_packet[self.cfg.DATA_OFFSET + 8: self.cfg.DATA_OFFSET + 12]))[0]
             data = {'vx': vx, 'vy': vy, 'vw': vw}
         # Parse color data, CMD_ID = 0x01
-        elif (cmd_id == self.cfg.COLOR_CMD_ID):
+        elif cmd_id == self.cfg.COLOR_CMD_ID:
             # 0 for RED; 1 for BLUE
             my_color_int = int(possible_packet[self.cfg.DATA_OFFSET])
             if my_color_int == 0:
@@ -368,7 +370,7 @@ class UARTCommunicator:
         # empty binary string
         packet = b''
         # Parse Gimbal data, CMD_ID = 0x00
-        if (cmd_id == self.cfg.GIMBAL_CMD_ID):
+        if cmd_id == self.cfg.GIMBAL_CMD_ID:
             # "<f" means little endian float
             packet += struct.pack("<f", data['rel_yaw'])
             packet += struct.pack("<f", data['rel_pitch'])
@@ -376,13 +378,13 @@ class UARTCommunicator:
             packet += self.cfg.GIMBAL_MODE.index(data['mode']).to_bytes(1, self.endianness)
             packet += data['debug_int'].to_bytes(1, self.endianness)
         # Parse Chassis data, CMD_ID = 0x02
-        elif (cmd_id == self.cfg.CHASSIS_CMD_ID):
+        elif cmd_id == self.cfg.CHASSIS_CMD_ID:
             # "<f" means little endian float
             packet += struct.pack("<f", data['vx'])
             packet += struct.pack("<f", data['vy'])
             packet += struct.pack("<f", data['vw'])
         # Parse color data, CMD_ID = 0x01
-        elif (cmd_id == self.cfg.COLOR_CMD_ID):
+        elif cmd_id == self.cfg.COLOR_CMD_ID:
             # 0 for RED; 1 for BLUE
             if data['my_color'] == 'red':
                 my_color_int = 0
@@ -403,7 +405,7 @@ class UARTCommunicator:
 
 if __name__ == '__main__':
     TESTING_TX_RX = False
-    TESTING_CRC = True
+    TESTING_CRC = False
     # Testing example if run as main
     import sys
     import os
@@ -428,11 +430,11 @@ if __name__ == '__main__':
             i = i + 1
             # every 0.5 sec, send current status to stm32
             if i % 100 == 0:
-                print("about to send" + str(data))
+                print("about to send " + str(data))
                 uart.create_and_send_packet(cmd_id, data)
                 i = 0
     else:
-        # rate test by Roger, flash example/minipc/StressTestTypeC.cc or typeA.cc
+        # rate test by Roger, flash example/minipc/StressTestTypeC.cc
         if TESTING_CRC:
 
             print("Starting packet sending test.")
@@ -460,6 +462,7 @@ if __name__ == '__main__':
             print(uart.get_current_stm32_state())
             print("Packet receiving test complete.")
         else:
+            # vanilla send test, flash typeA.cc
             cur_packet_cnt = uart.parsed_packet_cnt
             cur_time = time.time()
             prv_parsed_packet_cnt = 0
