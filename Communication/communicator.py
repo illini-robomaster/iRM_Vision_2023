@@ -7,6 +7,10 @@ import threading
 import struct
 from copy import deepcopy
 
+from enum import Enum
+
+    
+
 # STM32 to Jetson packet size
 STJ_MAX_PACKET_SIZE = 21
 STJ_MIN_PACKET_SIZE = 10
@@ -195,7 +199,7 @@ class UARTCommunicator:
                         self.cfg.CMD_TO_LEN[ret_dict['cmd_id']] + self.cfg.HT_LEN):]
                     packet_found = True
                 else:
-                    self.circular_buffer = self.circular_buffer[start_idx + self.cfg.PACK_START:]
+                    self.circular_buffer = self.circular_buffer[start_idx + STJ_MIN_PACKET_SIZE:]
                 start_idx = 0
             else:
                 start_idx += 1
@@ -403,9 +407,16 @@ class UARTCommunicator:
         return ret_dict
 
 
+class Test(Enum):
+    LATENCY=1
+    PINGPONG=2
+    CRC=3
+    TYPE_A=4
+    MODIFIED_PINGPONG=5
+
+
 if __name__ == '__main__':
-    TESTING_TX_RX = False
-    TESTING_CRC = False
+    testing = Test.MODIFIED_PINGPONG
     # Testing example if run as main
     import sys
     import os
@@ -414,29 +425,109 @@ if __name__ == '__main__':
     import config
     uart = UARTCommunicator(config)
 
-    # RX/TX test by youhy, flash example/minipc/PingpongTest.cc
-    # receive packet from stm32, rel_pitch += 1 then immediately send back
-    if TESTING_TX_RX:
-        i = 0
-        cmd_id = uart.cfg.GIMBAL_CMD_ID
-        data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
-        while True:
-            uart.try_read_one()
-            # update stm32 status from packet from stm32
-            if uart.packet_search():
-                data = uart.get_current_stm32_state()
-                print("from stm32: " + str(data))
-            time.sleep(0.005)
-            i = i + 1
-            # every 0.5 sec, send current status to stm32
-            if i % 100 == 0:
-                print("about to send " + str(data))
-                uart.create_and_send_packet(cmd_id, data)
-                i = 0
-    else:
-        # rate test by Roger, flash example/minipc/StressTestTypeC.cc
-        if TESTING_CRC:
+    match testing:
+        #Latency test by Richard, flash example/minipc/LatencyTest.cc
+        case Test.LATENCY:
+            # in the packet, rel_yaw is the current time
+            i = 0
+            cmd_id = uart.cfg.GIMBAL_CMD_ID
+            data = {'rel_yaw': 0.0, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
 
+            start_time = time.time()
+
+            last_read_time = 0
+
+            while True:
+                time.sleep(0.005)  # simulate 200Hz
+                cmd_id = uart.cfg.GIMBAL_CMD_ID
+                if i==100: #send timestamp to minipc twice every 500ms
+                    data = {'rel_yaw': time.time()-start_time, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
+                    uart.create_and_send_packet(cmd_id, data)
+                    print("sending timestamp to stm32:" + str(data['rel_yaw']))
+                    time.sleep(0.005)
+                    data = {'rel_yaw': time.time()-start_time, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
+                    uart.create_and_send_packet(cmd_id, data)
+                    print("sending timestamp to stm32:" + str(data['rel_yaw']))
+                    i = 0
+
+                uart.try_read_one()
+                # the latency caused by this loop should be at most 5ms
+                # the latency caused by the loop on stm32 should be at most 10ms (osDelay(10))
+                if uart.packet_search(): 
+                    received_data = uart.get_current_stm32_state()
+                    latency = time.time()-start_time - received_data['rel_yaw']
+                    print("timestamp from stm32: " + str(received_data['rel_yaw']))
+                    print("time for roundtrip transmission:" + str(latency))
+                    print("***********************************************************************")
+                i += 1
+
+        # RX/TX test by youhy, flash example/minipc/PingpongTest.cc
+        # receive packet from stm32, rel_pitch += 1 then immediately send back
+        case Test.PINGPONG:
+            i = 0
+            cmd_id = uart.cfg.GIMBAL_CMD_ID
+            data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
+            while True:
+                uart.try_read_one()
+                # update stm32 status from packet from stm32
+                if uart.packet_search():
+                    data = uart.get_current_stm32_state()
+                    print("from stm32: " + str(data))
+                time.sleep(0.005)
+                i = i + 1
+                # every 0.5 sec, send current status to stm32
+                if i % 100 == 0:
+                    print("about to send " + str(data))
+                    uart.create_and_send_packet(cmd_id, data)
+                    i = 0
+        # RX/TX test by Richard, flash example/minipc/PingPongTestPlus.cc
+        # receive packet from stm32, rel_pitch += 1 then immediately send back
+        # this ping pong test first trys to send a packet and then attmepts to read the response from stm32 for 10 seconds
+        # then send a second packet
+        # after that entering ping pong mode 
+        # each packet has a ID for differentiating during pingping-ing
+        # this test shows the issue that a response can only be received after sending a second packet
+        # this could be an issue in this file but could also be in the Embedded repo
+             
+        case Test.MODIFIED_PINGPONG:
+            i = 0
+            cmd_id = uart.cfg.GIMBAL_CMD_ID
+            packet_count = 0
+
+
+            #sending packet the first time
+            data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
+            print("Sending the first time: ID = " + str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
+            uart.create_and_send_packet(cmd_id, data)
+
+            #attempt to receive packet
+            for i in range(100):
+                time.sleep(0.1)
+                uart.try_read_one()
+                if uart.packet_search():
+                    received_data = uart.get_current_stm32_state()
+                    print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
+
+
+            #sending packet the second time
+            packet_count += 1
+            data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
+            print("Sending the second time: ID = " + str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
+            uart.create_and_send_packet(cmd_id, data)
+
+            #start ping pong
+            while True:
+                uart.try_read_one()
+                # update stm32 status from packet from stm32
+                if uart.packet_search():
+                    received_data = uart.get_current_stm32_state()
+                    print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
+                    received_data['rel_pitch'] = received_data['rel_pitch'] + 1
+                    uart.create_and_send_packet(cmd_id, received_data)
+
+                time.sleep(0.005)
+        case Test.CRC:
+            # rate test by Roger, flash example/minipc/StressTestTypeC.cc
             print("Starting packet sending test.")
             for i in range(1000):
                 time.sleep(0.005)  # simulate 200Hz
@@ -461,7 +552,7 @@ if __name__ == '__main__':
 
             print(uart.get_current_stm32_state())
             print("Packet receiving test complete.")
-        else:
+        case Test.TYPE_A:
             # vanilla send test, flash typeA.cc
             cur_packet_cnt = uart.parsed_packet_cnt
             cur_time = time.time()
@@ -478,3 +569,5 @@ if __name__ == '__main__':
                         cur_packet_cnt - prv_parsed_packet_cnt))
                     prv_parsed_packet_cnt = cur_packet_cnt
                     cur_time = time.time()
+        case _:
+            print("Testing Invalid") 
