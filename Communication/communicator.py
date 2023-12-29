@@ -205,6 +205,9 @@ class UARTCommunicator:
                 start_idx += 1
         return packet_found
 
+    def get_circular_buffer(self):
+        return self.circular_buffer[:]
+
     def update_current_state(self, ret_dict):
         """
         Update stm32 state dict.
@@ -242,8 +245,12 @@ class UARTCommunicator:
         assert possible_packet[0] == self.cfg.PACK_START[0]
         assert possible_packet[1] == self.cfg.PACK_START[1]
 
+        # Check CMD ID valid
         cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
-        packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN
+        if cmd_id in self.cfg.CMD_TO_LEN.keys():
+            packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN  #"KeyError: 84"?
+        else:
+            return None
 
         # Check packet end
         if possible_packet[packet_len -
@@ -413,10 +420,12 @@ class Test(Enum):
     CRC=3
     TYPE_A=4
     MODIFIED_PINGPONG=5
+    COLOR=6
+    CHASSIS=7
 
 
 if __name__ == '__main__':
-    testing = Test.MODIFIED_PINGPONG
+    testing = Test.CRC
     # Testing example if run as main
     import sys
     import os
@@ -426,40 +435,96 @@ if __name__ == '__main__':
     uart = UARTCommunicator(config)
 
     match testing:
+        #Test for CHASSIS packet by Richard, flash exampels/minipc/ChassisTest.cc
+        case Test.CHASSIS:
+            cmd_id = uart.cfg.CHASSIS_CMD_ID
+
+            data = {'vx': 10.0, 'vy': 11.0, 'vw' : 12.0}
+            print("sending color data:" + str(data))
+            uart.create_and_send_packet(cmd_id, data)
+            send_time = time.time()
+
+            received = False
+            #trying to read response for 1 s
+            while time.time()-send_time < 1:
+                if uart.try_read_one():
+                    print(uart.get_circular_buffer())
+                if uart.packet_search(): 
+                    received_data = uart.get_current_stm32_state()
+                    latency = time.time()-send_time
+                    print("from stm32: " + str(received_data))
+                    print("time for roundtrip transmission:" + str(latency))
+                    print("***********************************************************************")
+                    received = True
+                    break
+
+            if not received:
+                print("Response Package not recevied")
+    
+        #Test for COLOR packet by Richard, flash examples/minipc/ColorTest.cc
+        case Test.COLOR:
+            cmd_id = uart.cfg.COLOR_CMD_ID
+
+            data = {'my_color': 'red'}
+            print("sending color data:" + str(data['my_color']))
+            uart.create_and_send_packet(cmd_id, data)
+            send_time = time.time()
+
+            received = False
+            #trying to read response for 1 s
+            while time.time()-send_time < 1:
+
+                if uart.try_read_one():
+                    print(uart.get_circular_buffer())
+                if uart.packet_search(): 
+                    received_data = uart.get_current_stm32_state()
+                    latency = time.time()-send_time
+                    print("color data from stm32: " + str(received_data['my_color']))
+                    print("time for roundtrip transmission:" + str(latency))
+                    print("***********************************************************************")
+                    received = True
+                    break
+
+            if not received:
+                print("Response Package not recevied")
+                    
+            
         #Latency test by Richard, flash example/minipc/LatencyTest.cc
         case Test.LATENCY:
             # in the packet, rel_yaw is the current time
             i = 0
-            cmd_id = uart.cfg.GIMBAL_CMD_ID
-            data = {'rel_yaw': 0.0, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
+            cmd_id = uart.cfg.CHASSIS_CMD_ID #it has to be the packet type that has the maximum size
+            average_latency = 0
 
-            start_time = time.time()
+            for i in range(10):
+                #sending data
+                send_time = time.time()
+                data = {'vx': i, 'vy': 0.0, 'vw': 0.0}
+                uart.create_and_send_packet(cmd_id, data)
+                print("sending packet to stm32...")
 
-            last_read_time = 0
-
-            while True:
-                time.sleep(0.005)  # simulate 200Hz
-                cmd_id = uart.cfg.GIMBAL_CMD_ID
-                if i==100: #send timestamp to minipc twice every 500ms
-                    data = {'rel_yaw': time.time()-start_time, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-                    uart.create_and_send_packet(cmd_id, data)
-                    print("sending timestamp to stm32:" + str(data['rel_yaw']))
-                    time.sleep(0.005)
-                    data = {'rel_yaw': time.time()-start_time, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-                    uart.create_and_send_packet(cmd_id, data)
-                    print("sending timestamp to stm32:" + str(data['rel_yaw']))
-                    i = 0
-
-                uart.try_read_one()
-                # the latency caused by this loop should be at most 5ms
-                # the latency caused by the loop on stm32 should be at most 10ms (osDelay(10))
-                if uart.packet_search(): 
-                    received_data = uart.get_current_stm32_state()
-                    latency = time.time()-start_time - received_data['rel_yaw']
-                    print("timestamp from stm32: " + str(received_data['rel_yaw']))
-                    print("time for roundtrip transmission:" + str(latency))
-                    print("***********************************************************************")
-                i += 1
+                #try to read, 1s timeout
+                received=False
+                while time.time() - send_time < 1:
+                    uart.try_read_one()
+                    if uart.packet_search(): 
+                        received_data = uart.get_current_stm32_state()
+                        latency = time.time()-send_time
+                        if(received_data['vx'] == i):
+                            print("correct data received")
+                            received=True
+                        else:
+                            print("data received but incorrect")
+                        average_latency += latency
+                        print("time for roundtrip transmission:" + str(latency))
+                        print("***********************************************************************")
+                        received = True
+                        break
+                
+                if not received:
+                    print("Response Package not recevied")
+            average_latency /= 10
+            print("average latency is " + str(average_latency))
 
         # RX/TX test by youhy, flash example/minipc/PingpongTest.cc
         # receive packet from stm32, rel_pitch += 1 then immediately send back
@@ -480,20 +545,20 @@ if __name__ == '__main__':
                     print("about to send " + str(data))
                     uart.create_and_send_packet(cmd_id, data)
                     i = 0
+        
         # RX/TX test by Richard, flash example/minipc/PingPongTestPlus.cc
         # receive packet from stm32, rel_pitch += 1 then immediately send back
         # this ping pong test first trys to send a packet and then attmepts to read the response from stm32 for 10 seconds
         # then send a second packet
         # after that entering ping pong mode 
         # each packet has a ID for differentiating during pingping-ing
-        # this test shows the issue that a response can only be received after sending a second packet
-        # this could be an issue in this file but could also be in the Embedded repo
-             
+        # TODO: this test shows the issue that a response can only be received after the data in circular_buffer is at least 
+                    # the maximum size of a packet (STJ_MAX_PACKET_SIZE), so if sending some small packets
+                    # they will stay in the circular_buffer waiting to be parsed until new packets are received
         case Test.MODIFIED_PINGPONG:
             i = 0
             cmd_id = uart.cfg.GIMBAL_CMD_ID
             packet_count = 0
-
 
             #sending packet the first time
             data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
@@ -501,9 +566,12 @@ if __name__ == '__main__':
             uart.create_and_send_packet(cmd_id, data)
 
             #attempt to receive packet
-            for i in range(100):
+            print('attemp to receive and parse response...')
+            for i in range(20):
                 time.sleep(0.1)
-                uart.try_read_one()
+                if uart.try_read_one():
+                    print("data waiting at serial port")
+                    print("circular buffer:" + str(uart.get_circular_buffer()))
                 if uart.packet_search():
                     received_data = uart.get_current_stm32_state()
                     print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
@@ -515,6 +583,7 @@ if __name__ == '__main__':
             print("Sending the second time: ID = " + str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
             uart.create_and_send_packet(cmd_id, data)
 
+            print('starting ping pong')
             #start ping pong
             while True:
                 uart.try_read_one()
@@ -525,9 +594,12 @@ if __name__ == '__main__':
                     received_data['rel_pitch'] = received_data['rel_pitch'] + 1
                     uart.create_and_send_packet(cmd_id, received_data)
 
-                time.sleep(0.005)
+                time.sleep(0.05)
         case Test.CRC:
-            # rate test by Roger, flash example/minipc/StressTestTypeC.cc
+            # rate test by Roger modified by Richard, flash example/minipc/StressTestTypeC.cc
+            # TODO: currently this test will never receive full 1000 packets but only 998 packets because the last two packets
+            # remain in circular buffer and not parsed because its size is not reaching STJ_MAX_PACKET_SIZE
+            # NOTE: please reflash or restart program on stm32 every time you want to run this test
             print("Starting packet sending test.")
             for i in range(1000):
                 time.sleep(0.005)  # simulate 200Hz
@@ -536,20 +608,23 @@ if __name__ == '__main__':
                 uart.create_and_send_packet(cmd_id, data)
 
             print("Packet sending test complete.")
-            print("You should see the light change from bllue to green on type C board.")
+            print("You should see the light change from blue to green on type C board.")
+            print("When the led turns red the stm32 is sending data.")
             print("Starting packet receiving test.")
 
-            while True:
-                if uart.parsed_packet_cnt == 1000:
-                    print("Receiver successfully parsed exactly 1000 packets.")
-                    break
-                if uart.parsed_packet_cnt > 1000:
-                    print("Repeatedly parsed one packet?")
-                    break
+            start_time = time.time()
+            while time.time() - start_time < 10: #10s timeout
                 uart.try_read_one()
-                uart.packet_search()
-                time.sleep(0.001)
 
+                if uart.packet_search():
+                    received_data = uart.get_current_stm32_state()
+                    # print("from stm32: color = " + str(received_data['my_color']))
+                time.sleep(0.001)
+            print("Read and parsed %d/1000 packets." % uart.parsed_packet_cnt)
+            if uart.parsed_packet_cnt == 1000:
+                print("Receiver successfully parsed exactly 100 packets.")
+            if uart.parsed_packet_cnt > 1000:
+                print("Repeatedly parsed one packet?") 
             print(uart.get_current_stm32_state())
             print("Packet receiving test complete.")
         case Test.TYPE_A:
