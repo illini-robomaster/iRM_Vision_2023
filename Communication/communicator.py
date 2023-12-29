@@ -419,13 +419,10 @@ class Test(Enum):
     PINGPONG=2
     CRC=3
     TYPE_A=4
-    MODIFIED_PINGPONG=5
-    COLOR=6
-    CHASSIS=7
 
 
 if __name__ == '__main__':
-    testing = Test.CRC
+    testing = Test.PINGPONG
     # Testing example if run as main
     import sys
     import os
@@ -435,60 +432,6 @@ if __name__ == '__main__':
     uart = UARTCommunicator(config)
 
     match testing:
-        #Test for CHASSIS packet by Richard, flash exampels/minipc/ChassisTest.cc
-        case Test.CHASSIS:
-            cmd_id = uart.cfg.CHASSIS_CMD_ID
-
-            data = {'vx': 10.0, 'vy': 11.0, 'vw' : 12.0}
-            print("sending color data:" + str(data))
-            uart.create_and_send_packet(cmd_id, data)
-            send_time = time.time()
-
-            received = False
-            #trying to read response for 1 s
-            while time.time()-send_time < 1:
-                if uart.try_read_one():
-                    print(uart.get_circular_buffer())
-                if uart.packet_search(): 
-                    received_data = uart.get_current_stm32_state()
-                    latency = time.time()-send_time
-                    print("from stm32: " + str(received_data))
-                    print("time for roundtrip transmission:" + str(latency))
-                    print("***********************************************************************")
-                    received = True
-                    break
-
-            if not received:
-                print("Response Package not recevied")
-    
-        #Test for COLOR packet by Richard, flash examples/minipc/ColorTest.cc
-        case Test.COLOR:
-            cmd_id = uart.cfg.COLOR_CMD_ID
-
-            data = {'my_color': 'red'}
-            print("sending color data:" + str(data['my_color']))
-            uart.create_and_send_packet(cmd_id, data)
-            send_time = time.time()
-
-            received = False
-            #trying to read response for 1 s
-            while time.time()-send_time < 1:
-
-                if uart.try_read_one():
-                    print(uart.get_circular_buffer())
-                if uart.packet_search(): 
-                    received_data = uart.get_current_stm32_state()
-                    latency = time.time()-send_time
-                    print("color data from stm32: " + str(received_data['my_color']))
-                    print("time for roundtrip transmission:" + str(latency))
-                    print("***********************************************************************")
-                    received = True
-                    break
-
-            if not received:
-                print("Response Package not recevied")
-                    
-            
         #Latency test by Richard, flash example/minipc/LatencyTest.cc
         case Test.LATENCY:
             # in the packet, rel_yaw is the current time
@@ -499,7 +442,7 @@ if __name__ == '__main__':
             for i in range(10):
                 #sending data
                 send_time = time.time()
-                data = {'vx': i, 'vy': 0.0, 'vw': 0.0}
+                data = {'vx': i, 'vy': 0.0, 'vw': 0.0} #if changed data type, please also modify this
                 uart.create_and_send_packet(cmd_id, data)
                 print("sending packet to stm32...")
 
@@ -525,37 +468,20 @@ if __name__ == '__main__':
                     print("Response Package not recevied")
             average_latency /= 10
             print("average latency is " + str(average_latency))
-
-        # RX/TX test by youhy, flash example/minipc/PingpongTest.cc
-        # receive packet from stm32, rel_pitch += 1 then immediately send back
-        case Test.PINGPONG:
-            i = 0
-            cmd_id = uart.cfg.GIMBAL_CMD_ID
-            data = {'rel_yaw': 1.0, 'rel_pitch': 2.0, 'mode': 'ST', 'debug_int': 42}
-            while True:
-                uart.try_read_one()
-                # update stm32 status from packet from stm32
-                if uart.packet_search():
-                    data = uart.get_current_stm32_state()
-                    print("from stm32: " + str(data))
-                time.sleep(0.005)
-                i = i + 1
-                # every 0.5 sec, send current status to stm32
-                if i % 100 == 0:
-                    print("about to send " + str(data))
-                    uart.create_and_send_packet(cmd_id, data)
-                    i = 0
         
-        # RX/TX test by Richard, flash example/minipc/PingPongTestPlus.cc
-        # receive packet from stm32, rel_pitch += 1 then immediately send back
+        # RX/TX test by YHY modified by Richard, flash example/minipc/PingPongTest.cc
         # this ping pong test first trys to send a packet and then attmepts to read the response from stm32 for 10 seconds
         # then send a second packet
-        # after that entering ping pong mode 
-        # each packet has a ID for differentiating during pingping-ing
+        # after that entering ping pong mode:
+        #   receive packet from stm32, rel_pitch += 1 then immediately send back
+        # each "ping pong" has a ID for differentiating during pingping-ing
         # TODO: this test shows the issue that a response can only be received after the data in circular_buffer is at least 
                     # the maximum size of a packet (STJ_MAX_PACKET_SIZE), so if sending some small packets
                     # they will stay in the circular_buffer waiting to be parsed until new packets are received
-        case Test.MODIFIED_PINGPONG:
+                    # for example, if STJ_MAX_PACKET_SIZE is 21 and GIMBAL data size is 19, then only after receiving 2 packets 
+                    # 2 * 19 > 21 then the first packet will be parsed.
+                    # if a data type is 10 bytes long then sending a third packet is necessary before pingpong
+        case Test.PINGPONG:
             i = 0
             cmd_id = uart.cfg.GIMBAL_CMD_ID
             packet_count = 0
@@ -575,7 +501,6 @@ if __name__ == '__main__':
                 if uart.packet_search():
                     received_data = uart.get_current_stm32_state()
                     print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
-
 
             #sending packet the second time
             packet_count += 1
