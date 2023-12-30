@@ -9,14 +9,14 @@ import time
 import cv2
 from Aiming.Aim import Aim
 # from Detection.YOLO import Yolo
-from Detection.CV_mix_DL import cv_mix_dl_detector
+from Detection.two_stage_yolo import two_stage_yolo_detector
 from Communication.communicator import UARTCommunicator
 import config
 
 
 def main():
     """Define the main while-true control loop that manages everything."""
-    model = cv_mix_dl_detector(config, config.DEFAULT_ENEMY_TEAM)
+    model = two_stage_yolo_detector(config, config.DEFAULT_ENEMY_TEAM)
     # model = Yolo(config.MODEL_CFG_PATH, config.WEIGHT_PATH, config.META_PATH)
     aimer = Aim(config)
 
@@ -38,33 +38,33 @@ def main():
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
         enemy_team = stm32_state_dict['enemy_color']
-        model.change_color(enemy_team)
+        model.change_target_color(enemy_team)
 
         pred = model.detect(frame)
 
-        for i in range(len(pred)):
-            name, conf, armor_type, bbox, armor = pred[i]
-            # name from C++ string is in bytes; decoding is needed
-            if isinstance(name, bytes):
-                name_str = name.decode('utf-8')
-            else:
-                name_str = name
-            pred[i] = (name_str, conf, armor_type, bbox, armor)
+        # for i in range(len(pred)):
+        #     name, conf, armor_type, bbox, armor = pred[i]
+        #     # name from C++ string is in bytes; decoding is needed
+        #     if isinstance(name, bytes):
+        #         name_str = name.decode('utf-8')
+        #     else:
+        #         name_str = name
+        #     pred[i] = (name_str, conf, armor_type, bbox, armor)
 
         elapsed = time.time() - start
 
-        if config.DEBUG_DISPLAY:
-            viz_frame = frame.copy()
-            for _, _, _, bbox, _ in pred:
-                lower_x = int(bbox[0] - bbox[2] / 2)
-                lower_y = int(bbox[1] - bbox[3] / 2)
-                upper_x = int(bbox[0] + bbox[2] / 2)
-                upper_y = int(bbox[1] + bbox[3] / 2)
-                viz_frame = cv2.rectangle(
-                    viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
-            cv2.imshow('all_detected', viz_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                exit(0)
+        # if config.DEBUG_DISPLAY:
+        #     viz_frame = frame.copy()
+        #     for _, _, _, bbox, _ in pred:
+        #         lower_x = int(bbox[0] - bbox[2] / 2)
+        #         lower_y = int(bbox[1] - bbox[3] / 2)
+        #         upper_x = int(bbox[0] + bbox[2] / 2)
+        #         upper_y = int(bbox[1] + bbox[3] / 2)
+        #         viz_frame = cv2.rectangle(
+        #             viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
+        #     cv2.imshow('all_detected', viz_frame)
+        #     if cv2.waitKey(1) & 0xFF == ord('q'):
+        #         exit(0)
 
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
