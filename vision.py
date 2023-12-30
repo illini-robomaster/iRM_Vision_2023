@@ -12,6 +12,7 @@ from Aiming.Aim import Aim
 from Detection.two_stage_yolo import two_stage_yolo_detector
 from Communication.communicator import UARTCommunicator
 import config
+import Utils
 
 
 def main():
@@ -31,51 +32,32 @@ def main():
         print("SERIAL DEVICE IS NOT AVAILABLE!!!")
 
     while True:
-        start = time.time()
         stm32_state_dict = communicator.get_current_stm32_state()
+        print(stm32_state_dict)
         frame = autoaim_camera.get_frame()
+        tmp_dict = Utils.preprocess_img_step1(frame, config)
+        aug_img_dict = Utils.preprocess_img_step2(tmp_dict, config)
 
         # TODO: add a global reset function if enemy functions change
         # (e.g., clear the buffer in the armor tracker)
         enemy_team = stm32_state_dict['enemy_color']
         model.change_target_color(enemy_team)
 
-        pred = model.detect(frame)
-
-        # for i in range(len(pred)):
-        #     name, conf, armor_type, bbox, armor = pred[i]
-        #     # name from C++ string is in bytes; decoding is needed
-        #     if isinstance(name, bytes):
-        #         name_str = name.decode('utf-8')
-        #     else:
-        #         name_str = name
-        #     pred[i] = (name_str, conf, armor_type, bbox, armor)
-
-        elapsed = time.time() - start
-
-        # if config.DEBUG_DISPLAY:
-        #     viz_frame = frame.copy()
-        #     for _, _, _, bbox, _ in pred:
-        #         lower_x = int(bbox[0] - bbox[2] / 2)
-        #         lower_y = int(bbox[1] - bbox[3] / 2)
-        #         upper_x = int(bbox[0] + bbox[2] / 2)
-        #         upper_y = int(bbox[1] + bbox[3] / 2)
-        #         viz_frame = cv2.rectangle(
-        #             viz_frame, (lower_x, lower_y), (upper_x, upper_y), (0, 255, 0), 2)
-        #     cv2.imshow('all_detected', viz_frame)
-        #     if cv2.waitKey(1) & 0xFF == ord('q'):
-        #         exit(0)
+        pred = model.detect(aug_img_dict)
 
         # Tracking and filtering
         # Pour all predictions into the aimer, which returns relative angles
-        ret_dict = aimer.process_one(pred, enemy_team, frame, stm32_state_dict)
+        ret_dict = aimer.process_one(pred, enemy_team, stm32_state_dict)
 
         if config.DEBUG_DISPLAY:
-            show_frame = frame.copy()
+            show_frame = aug_img_dict['resized_img_bgr'].copy()
 
         if ret_dict:
-            communicator.process_one_packet(
-                config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
+            cur_time = time.time()
+            parsing_latency = cur_time - stm32_state_dict['timestamp']
+            if parsing_latency < 1:
+                communicator.process_one_packet(
+                    config.MOVE_YOKE, ret_dict['abs_yaw'], ret_dict['abs_pitch'])
             if config.DEBUG_DISPLAY:
                 # Reverse compute center_x and center_y from yaw angle
                 yaw_diff = ret_dict['abs_yaw'] - stm32_state_dict['cur_yaw']
@@ -104,10 +86,6 @@ def main():
             if config.DEBUG_DISPLAY:
                 show_frame = cv2.putText(show_frame, 'NOT FOUND', (50, 50),
                                          cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-        if config.DEBUG_PRINT:
-            print('----------------\n', pred)
-            print('fps:', 1. / elapsed)
 
         if config.DEBUG_DISPLAY:
             cv2.imshow('target', show_frame)

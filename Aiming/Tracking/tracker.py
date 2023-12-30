@@ -42,6 +42,7 @@ class tracker:
         self.target_state = np.zeros(9)
 
         self.last_yaw_ = 0
+        self.last_observation_time_ = 0
         self.detect_count_ = 0
         self.lost_count_ = 0
         self.ekf = ExtendedKalmanFilter()
@@ -58,7 +59,7 @@ class tracker:
         # FIXME: implement this to adapt to different armor boards for RMUC!
         raise NotImplementedError
 
-    def init_tracker_(self, pred_list):
+    def init_tracker_(self, pred_list, observation_timestamp):
         """Initialize the tracker.
 
         Internal function. DO NOT call this function directly.
@@ -85,11 +86,12 @@ class tracker:
         self.init_EKF(pred_list, selected_armor_idx)
         self.tracked_id = armor_type
         self.tracked_state = 'DETECTING'
+        self.last_observation_time_ = observation_timestamp
 
         # FIXME
         # self.update_armors_num()
 
-    def update_tracker_(self, pred_list, dt):
+    def update_tracker_(self, pred_list, observation_timestamp):
         """Update the tracker.
 
         Internal function. DO NOT call this function directly.
@@ -98,6 +100,9 @@ class tracker:
             pred_list (list): a list of recognized armors
             dt (float): time interval between two observations
         """
+        dt = observation_timestamp - self.last_observation_time_
+        self.last_observation_time_ = observation_timestamp
+
         ekf_pred = self.ekf.predict(dt)
 
         matched = False
@@ -297,23 +302,31 @@ class tracker:
             tuple: (dist, gimbal_pitch, gimbal_yaw) for selected robot
                     None if no robot is selected or the tracking is lost.
         """
+        observation_timestamp = stm32_state_dict['timestamp']
         if self.tracked_state == 'LOST':
-            self.init_tracker_(pred_list)
+            self.init_tracker_(pred_list, observation_timestamp)
             return None
         else:
-            # FIXME
-            dt = 1.0 / 30.0
-            self.update_tracker_(pred_list, dt)
+            self.update_tracker_(pred_list, observation_timestamp)
             if self.tracked_state == 'DETECTING':
                 return None
             elif self.tracked_state == 'TRACKING' or self.tracked_state == 'TEMP_LOST':
                 ret = self.target_state
+                PREDICTION_TIME = 0.2
+                xc, v_xc, yc, v_yc, za, v_za, yaw, v_yaw, r = ret
                 # X: from barrel rear to front
                 # Y: from barrel left to right
                 # Z: up is gravity direction
-                armor_pos = self.get_armor_position_from_state(ret)
-                dist = np.sqrt(armor_pos[0]**2 + armor_pos[2]**2)
+                if True:
+                    # Track robot center
+                    target_pos = np.array([xc + v_xc * PREDICTION_TIME,
+                                           yc + v_yc * PREDICTION_TIME,
+                                           za])
+                else:
+                    # directly tracks armor
+                    target_pos = self.get_armor_position_from_state(ret)
+                dist = np.sqrt(target_pos[0]**2 + target_pos[2]**2)
 
-                _, gimbal_pitch, gimbal_yaw = Utils.cartesian_to_spherical(*armor_pos)
+                _, gimbal_pitch, gimbal_yaw = Utils.cartesian_to_spherical(*target_pos)
 
                 return dist, gimbal_pitch, gimbal_yaw

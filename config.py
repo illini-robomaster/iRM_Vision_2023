@@ -11,7 +11,9 @@ from Camera.simple_cv import simple_cv_camera
 AUTOAIM_CAMERA = fake_camera
 # AUTOAIM_CAMERA = mdvs_camera
 # This param needs to be tuned per arena / camera setup
-EXPOSURE_TIME = 5
+EXPOSURE_TIME = 4  # in ms
+ANALOG_GAIN = 88  # Range seems to be 64-256; TODO: confirm from cam capability
+CAMERA_GAMMA = 100  # factory default is 100
 
 # Compute some constants and define camera to use
 IMG_HEIGHT = 512
@@ -37,6 +39,8 @@ K = np.array([
 
 # ========== Detection ==========
 YOLO_PATH = os.path.join(os.path.dirname(__file__), 'weights', 'shufflenet_no_nms.onnx')
+INT8_QUANTIZATION = False
+CALIB_IMG_DIR = 'calib_images'
 
 # ========== Trajectory Modeling ==========
 GRAVITY_CONSTANT = 9.81         # acceleration due to gravity
@@ -49,6 +53,9 @@ PACK_END = b'ED'
 
 # ========== DEBUGGING ==========
 
-DEBUG_DISPLAY = True
+DEBUG_DISPLAY = False
 DEBUG_PRINT = False
-DEFAULT_ENEMY_TEAM = 'red'
+DEFAULT_ENEMY_TEAM = 'blue'
+
+# ========== Recording ==========
+LOGGING_FOLDER = "logs"

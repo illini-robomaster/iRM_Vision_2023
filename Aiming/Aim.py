@@ -29,7 +29,7 @@ class Aim:
         self.tracker = tracker(self.CFG)
         self.distance_estimator = pnp_estimator(self.CFG)
 
-    def preprocess(self, pred_list, stm32_state_dict, raw_rgb_image):
+    def preprocess(self, pred_list, stm32_state_dict):
         """Preprocess predictions to compute armor distances and absolute yaw/pitch.
 
         Args:
@@ -51,14 +51,14 @@ class Aim:
             bbox = armor.bbox
             armor_type = armor.cls
             # armor_name, conf, armor_type, bbox, armor = pred
-            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor, raw_rgb_image)
+            armor_xyz, armor_yaw = self.distance_estimator.estimate_position(armor)
             armor_xyz = barrel_to_robot_T(gimbal_yaw, gimbal_pitch, armor_xyz)
 
             ret_list.append((armor_type, armor_xyz, bbox, armor_yaw))
 
         return ret_list
 
-    def process_one(self, pred_list, enemy_team, raw_rgb_image, stm32_state_dict):
+    def process_one(self, pred_list, enemy_team, stm32_state_dict):
         """Process one frame of predictions.
 
         Args:
@@ -72,7 +72,7 @@ class Aim:
         """
         assert enemy_team in ['blue', 'red']
 
-        observed_armors = self.preprocess(pred_list, stm32_state_dict, raw_rgb_image)
+        observed_armors = self.preprocess(pred_list, stm32_state_dict)
 
         target_dist_angle_tuple = self.tracker.process_one(observed_armors, stm32_state_dict)
 

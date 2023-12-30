@@ -45,7 +45,8 @@ class UARTCommunicator:
             'enemy_color': self.cfg.DEFAULT_ENEMY_TEAM.lower(),
             'cur_yaw': 0,
             'cur_pitch': 0,
-            'debug_int': 0}
+            'debug_int': 0,
+            'timestamp': 0}
 
         self.parsed_packet_cnt = 0
         self.seq_num = 0
@@ -238,6 +239,7 @@ class UARTCommunicator:
             'cur_yaw': cur_yaw,
             'cur_pitch': cur_pitch,
             'debug_int': debug_int,
+            'timestamp': time.time(),
         }
 
     def create_packet(self, header, yaw_offset, pitch_offset):

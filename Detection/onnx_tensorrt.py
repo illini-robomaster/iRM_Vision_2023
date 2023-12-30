@@ -235,7 +235,7 @@ class TensorRTBackendRep(BackendRep):
 
     def __init__(self, model, device,
                  max_workspace_size=None, serialize_engine=False, verbose=False,
-                 serialized_engine_path=None, **kwargs):
+                 serialized_engine_path=None, int8_calibrator=None, **kwargs):
         """Initialize a TensorRT backend rep.
 
         Args:
@@ -253,15 +253,25 @@ class TensorRTBackendRep(BackendRep):
         if self.serialized_engine_path is not None:
             assert serialize_engine
         self._logger = TRT_LOGGER
+        # Fore more builder config options, see
+        # https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Core/Builder.html
         self.builder = trt.Builder(self._logger)
         self.config = self.builder.create_builder_config()
+        # For more config options, see
+        # https://docs.nvidia.com/deeplearning/tensorrt/api/python_api/infer/Core/BuilderConfig.html
+        self.int8_calibrator = int8_calibrator
         if self.builder.platform_has_fast_fp16:
-            print("FAST FP16 detected. Enabling precision to FP16...")
+            print("[iRM] FAST FP16 detected. Enabling precision to FP16...")
+            self.serialized_engine_path = self.serialized_engine_path.replace('.trt', '_fp16.trt')
             self.config.set_flag(trt.BuilderFlag.FP16)
         # TODO(roger): enable INT8 requires post-training quantization and calibration
-        # if self.builder.platform_has_fast_int8:
-        #     print("FAST INT8 detected. Enabling INT8...")
-        #     self.config.set_flag(trt.BuilderFlag.INT8)
+        if self.builder.platform_has_fast_int8 and self.int8_calibrator is not None:
+            print("FAST INT8 detected. Enabling INT8...")
+            self.serialized_engine_path = self.serialized_engine_path.replace('.trt', '_int8.trt')
+            self.config.set_flag(trt.BuilderFlag.INT8)
+            self.config.int8_calibrator = self.int8_calibrator
+            # TODO: where should this go?
+            # self.config.set_calibration_profile(profile)
         self.network = self.builder.create_network(flags=1 << (
             int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
         self.parser = trt.OnnxParser(self.network, self._logger)
@@ -309,7 +319,7 @@ class TensorRTBackendRep(BackendRep):
                 trt_engine = self.runtime.deserialize_cuda_engine(f.read())
             self.engine = Engine(trt_engine)
         else:
-            print("First time building engine. This may take a while... (up to 20 minutes)")
+            print("[iRM] First time building engine. This may take a while... (up to 20 minutes)")
             self._build_engine()
 
         self._output_shapes = {}
@@ -328,6 +338,7 @@ class TensorRTBackendRep(BackendRep):
                         this means we are building the engine at run time,
                         because we need to register optimization profiles for some inputs
         """
+        opt_profile = None
         if inputs:
             opt_profile = self.builder.create_optimization_profile()
             # Set optimization profiles for the input bindings that need them
@@ -346,6 +357,11 @@ class TensorRTBackendRep(BackendRep):
                     opt_profile.set_shape(name, inputs[i].shape, inputs[i].shape, inputs[i].shape)
 
             self.config.add_optimization_profile(opt_profile)
+
+        if self.int8_calibrator is not None:
+            if opt_profile is None:
+                opt_profile = self.builder.create_optimization_profile()
+            self.config.set_calibration_profile(opt_profile)
 
         trt_engine = self.builder.build_engine(self.network, self.config)
 
