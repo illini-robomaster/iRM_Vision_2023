@@ -50,7 +50,7 @@ uint8_t identifier.
 
 | Name           | ID   | Data Length | Description                      |
 |----------------|------|-------------|----------------------------------|
-| GIMBAL_CMD_ID  | 0x00 | 12          | Movement of the gimbal           |
+| GIMBAL_CMD_ID  | 0x00 | 10          | Movement of the gimbal           |
 | COLOR_CMD_ID   | 0x01 | 1           | My color, red is 0 and blue is 1 |
 | CHASSIS_CMD_ID | 0x02 | 12          | Movement of the chassis          |
 
