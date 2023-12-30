@@ -7,9 +7,6 @@ import threading
 import struct
 from copy import deepcopy
 
-from enum import Enum
-
-    
 
 # STM32 to Jetson packet size
 STJ_MAX_PACKET_SIZE = 21
@@ -205,9 +202,6 @@ class UARTCommunicator:
                 start_idx += 1
         return packet_found
 
-    def get_circular_buffer(self):
-        return self.circular_buffer[:]
-
     def update_current_state(self, ret_dict):
         """
         Update stm32 state dict.
@@ -247,9 +241,10 @@ class UARTCommunicator:
 
         # Check CMD ID valid
         cmd_id = int(possible_packet[self.cfg.CMD_ID_OFFSET])
-        if cmd_id in self.cfg.CMD_TO_LEN.keys():
-            packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN  #"KeyError: 84"?
-        else:
+        try:
+            packet_len = self.cfg.CMD_TO_LEN[cmd_id] + self.cfg.HT_LEN
+        except BaseException:
+            print("Incorrect CMD_ID " + str(cmd_id))
             return None
 
         # Check packet end
@@ -414,13 +409,6 @@ class UARTCommunicator:
         return ret_dict
 
 
-class Test(Enum):
-    LATENCY=1
-    PINGPONG=2
-    CRC=3
-    TYPE_A=4
-
-
 if __name__ == '__main__':
     testing = Test.PINGPONG
     # Testing example if run as main
@@ -431,67 +419,86 @@ if __name__ == '__main__':
     import config
     uart = UARTCommunicator(config)
 
+    from enum import Enum
+
+    class Test(Enum):
+        """Class used to choose test for communicator."""
+
+        LATENCY = 1
+        PINGPONG = 2
+        CRC = 3
+        TYPE_A = 4
+
     match testing:
-        #Latency test by Richard, flash example/minipc/LatencyTest.cc
+        # Latency test by Richard, flash example/minipc/LatencyTest.cc
         case Test.LATENCY:
             # in the packet, rel_yaw is the current time
             i = 0
-            cmd_id = uart.cfg.CHASSIS_CMD_ID #it has to be the packet type that has the maximum size
+            cmd_id = uart.cfg.CHASSIS_CMD_ID
+            # it has to be the packet type that has the maximum size
+
             average_latency = 0
 
             for i in range(10):
-                #sending data
+                # sending data
                 send_time = time.time()
-                data = {'vx': i, 'vy': 0.0, 'vw': 0.0} #if changed data type, please also modify this
+                # if changed data type, please also modify this
+                data = {'vx': i, 'vy': 0.0, 'vw': 0.0}
                 uart.create_and_send_packet(cmd_id, data)
                 print("sending packet to stm32...")
 
-                #try to read, 1s timeout
-                received=False
+                # try to read, 1s timeout
+                received = False
                 while time.time() - send_time < 1:
                     uart.try_read_one()
-                    if uart.packet_search(): 
+                    if uart.packet_search():
                         received_data = uart.get_current_stm32_state()
-                        latency = time.time()-send_time
+                        latency = time.time() - send_time
                         if(received_data['vx'] == i):
                             print("correct data received")
-                            received=True
+                            received = True
                         else:
                             print("data received but incorrect")
                         average_latency += latency
                         print("time for roundtrip transmission:" + str(latency))
-                        print("***********************************************************************")
+                        print("**********************************************************")
                         received = True
                         break
-                
+
                 if not received:
                     print("Response Package not recevied")
             average_latency /= 10
             print("average latency is " + str(average_latency))
-        
+
         # RX/TX test by YHY modified by Richard, flash example/minipc/PingPongTest.cc
-        # this ping pong test first trys to send a packet and then attmepts to read the response from stm32 for 10 seconds
+        # this ping pong test first trys to send a packet
+        # and then attmepts to read the response from stm32 for 10 seconds
         # then send a second packet
         # after that entering ping pong mode:
         #   receive packet from stm32, rel_pitch += 1 then immediately send back
         # each "ping pong" has a ID for differentiating during pingping-ing
-        # TODO: this test shows the issue that a response can only be received after the data in circular_buffer is at least 
-                    # the maximum size of a packet (STJ_MAX_PACKET_SIZE), so if sending some small packets
-                    # they will stay in the circular_buffer waiting to be parsed until new packets are received
-                    # for example, if STJ_MAX_PACKET_SIZE is 21 and GIMBAL data size is 19, then only after receiving 2 packets 
-                    # 2 * 19 > 21 then the first packet will be parsed.
-                    # if a data type is 10 bytes long then sending a third packet is necessary before pingpong
+        # TODO: This test shows the issue that a response can only be received after the data
+            # in circular_buffer is at least the maximum size of a packet (STJ_MAX_PACKET_SIZE).
+            # So if sending some small packets,
+            # they will stay in the circular_buffer waiting to be parsed,
+            # until new packets are received.
+            # For example, if STJ_MAX_PACKET_SIZE is 21 and GIMBAL data size is 19,
+            # then only after receiving 2 packets (2 * 19 > 21)
+            # then the first packet will be parsed.
+            # If a data type is 10 bytes long then sending a third packet is necessary
+            # before pingpong
         case Test.PINGPONG:
             i = 0
             cmd_id = uart.cfg.GIMBAL_CMD_ID
             packet_count = 0
 
-            #sending packet the first time
+            # sending packet the first time
             data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-            print("Sending the first time: ID = " + str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
+            print("Sending the first time: ID = " +
+                  str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
             uart.create_and_send_packet(cmd_id, data)
 
-            #attempt to receive packet
+            # attempt to receive packet
             print('attemp to receive and parse response...')
             for i in range(20):
                 time.sleep(0.1)
@@ -500,30 +507,39 @@ if __name__ == '__main__':
                     print("circular buffer:" + str(uart.get_circular_buffer()))
                 if uart.packet_search():
                     received_data = uart.get_current_stm32_state()
-                    print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
+                    print("from stm32: ID = " +
+                          str(received_data['rel_yaw']) +
+                          " count = " +
+                          str(received_data['rel_pitch']))
 
-            #sending packet the second time
+            # sending packet the second time
             packet_count += 1
             data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-            print("Sending the second time: ID = " + str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
+            print("Sending the second time: ID = " +
+                  str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
             uart.create_and_send_packet(cmd_id, data)
 
             print('starting ping pong')
-            #start ping pong
+            # start ping pong
             while True:
                 uart.try_read_one()
                 # update stm32 status from packet from stm32
                 if uart.packet_search():
                     received_data = uart.get_current_stm32_state()
-                    print("from stm32: ID = " + str(received_data['rel_yaw']) + " count = " + str(received_data['rel_pitch']))
+                    print("from stm32: ID = " +
+                          str(received_data['rel_yaw']) +
+                          " count = " +
+                          str(received_data['rel_pitch']))
                     received_data['rel_pitch'] = received_data['rel_pitch'] + 1
                     uart.create_and_send_packet(cmd_id, received_data)
 
                 time.sleep(0.05)
         case Test.CRC:
             # rate test by Roger modified by Richard, flash example/minipc/StressTestTypeC.cc
-            # TODO: currently this test will never receive full 1000 packets but only 998 packets because the last two packets
-            # remain in circular buffer and not parsed because its size is not reaching STJ_MAX_PACKET_SIZE
+            # TODO: currently this test will never receive full 1000 packets
+            #    but only 998 packets because the last two packets
+            #    remain in circular buffer and not parsed because
+            #    its size is not reaching STJ_MAX_PACKET_SIZE
             # NOTE: please reflash or restart program on stm32 every time you want to run this test
             print("Starting packet sending test.")
             for i in range(1000):
@@ -538,7 +554,7 @@ if __name__ == '__main__':
             print("Starting packet receiving test.")
 
             start_time = time.time()
-            while time.time() - start_time < 10: #10s timeout
+            while time.time() - start_time < 10:  # 10s timeout
                 uart.try_read_one()
 
                 if uart.packet_search():
@@ -549,7 +565,7 @@ if __name__ == '__main__':
             if uart.parsed_packet_cnt == 1000:
                 print("Receiver successfully parsed exactly 100 packets.")
             if uart.parsed_packet_cnt > 1000:
-                print("Repeatedly parsed one packet?") 
+                print("Repeatedly parsed one packet?")
             print(uart.get_current_stm32_state())
             print("Packet receiving test complete.")
         case Test.TYPE_A:
@@ -570,4 +586,4 @@ if __name__ == '__main__':
                     prv_parsed_packet_cnt = cur_packet_cnt
                     cur_time = time.time()
         case _:
-            print("Testing Invalid") 
+            print("Testing Invalid")
