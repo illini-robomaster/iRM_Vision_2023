@@ -410,7 +410,6 @@ class UARTCommunicator:
 
 
 if __name__ == '__main__':
-    testing = Test.PINGPONG
     # Testing example if run as main
     import sys
     import os
@@ -428,6 +427,7 @@ if __name__ == '__main__':
         PINGPONG = 2
         CRC = 3
         TYPE_A = 4
+    testing = Test.PINGPONG
 
     match testing:
         # Latency test by Richard, flash example/minipc/LatencyTest.cc
@@ -504,7 +504,7 @@ if __name__ == '__main__':
                 time.sleep(0.1)
                 if uart.try_read_one():
                     print("data waiting at serial port")
-                    print("circular buffer:" + str(uart.get_circular_buffer()))
+                    print("circular buffer:" + str(uart.circular_buffer))
                 if uart.packet_search():
                     received_data = uart.get_current_stm32_state()
                     print("from stm32: ID = " +
