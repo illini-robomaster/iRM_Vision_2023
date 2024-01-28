@@ -31,6 +31,7 @@ PACK_END = b'ED'
 GIMBAL_CMD_ID = 0x00
 COLOR_CMD_ID = 0x01
 CHASSIS_CMD_ID = 0x02
+SELFCHECK_CMD_ID = 0x03
 
 # mapping from cmd_id to data section length of the packet, unit: byte
 # packet length = data length + 9
@@ -38,6 +39,7 @@ CMD_TO_LEN = {
     GIMBAL_CMD_ID: 10,
     COLOR_CMD_ID: 1,
     CHASSIS_CMD_ID: 12,
+    SELFCHECK_CMD_ID: 10,
 }
 # length of Header + Tail = 9 bytes
 HT_LEN = 9
@@ -47,6 +49,13 @@ HT_LEN = 9
 GIMBAL_MODE = [
     'ST',
     'MY',
+]
+
+# 0 for echo
+# 1 for ignore
+SELFCHECK_MODE = [
+    'EC',
+    'IG',
 ]
 
 SEQNUM_OFFSET = 2

@@ -16,6 +16,7 @@ dist/
 downloads/
 eggs/
 .eggs/
+# Also used in for venv
 lib/
 lib64/
 parts/
@@ -111,6 +112,13 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# python venv
+bin/
+include/
+lib64
+pyvenv.cfg
+share/
 
 # Spyder project settings
 .spyderproject
