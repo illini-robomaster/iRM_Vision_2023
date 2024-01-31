@@ -4,19 +4,17 @@
         0) The configuration file (config.py)
 
         1) To add a new logger, modify:
-        1.1) loggers  = [ (minipc.py:38)
+        1.1) loggers  = [
 
         2) The identification scheme
-        2.1) class Dev(IntEnum): (minipc.py:43)
-        2.2) intenum_to_name = { (-:57)
-        2.3) if parsed_args.plug_test: (-:389)
-        2.4) serial_devices = { (-:69)
+        2.1) class DeviceName(IntEnum):
+        2.2) intenum_to_name = {
+        2.3) if parsed_args.plug_test:
+        2.4) serial_devices[.*\] = 
+        2.5) serial_devices = {
 
-        3) The secion in __name__ == __main__
-        3.1) serial_devices[ (-:395)
-
-        4) argparse
-        4.1) ap = argparse (minipc.py:77)
+        3) argparse
+        3.1) ap\.add_argument(
 """
 import sys
 import time
@@ -26,10 +24,12 @@ from enum import IntEnum
 from collections import namedtuple
 from subprocess import run as sp_run
 
-import config  # TODO: support multiple config files/config.Config1 etc
+import config  # TODO: support multiple config files/config.ConfigA etc
 
 from Utils import color_logging as cl
 from Utils.ansi import *
+from Utils.atomiclist import AtomicList
+
 from Communication import communicator
 from Communication.communicator import Communicator, UARTCommunicator, USBCommunicator
 from Communication.packet import UARTPacket, USBPacket
@@ -40,7 +40,7 @@ loggers = [logger := logging.getLogger(__name__),
 
 
 # UART > 0, USB <= 0
-class Dev(IntEnum):
+class DeviceName(IntEnum):
     UART = 1  # serialless uart, also acts to `type' others
     BRD = 2  # board
     SPM = 3  # spacemouse
@@ -49,11 +49,11 @@ class Dev(IntEnum):
     ARM = -1  # arm
 
 
-UART = Dev.UART
-USB = Dev.USB
-BRD = Dev.BRD
-SPM = Dev.SPM
-ARM = Dev.ARM
+UART = DeviceName.UART
+USB = DeviceName.USB
+BRD = DeviceName.BRD
+SPM = DeviceName.SPM
+ARM = DeviceName.ARM
 
 intenum_to_name = {
     UART: 'UART',
@@ -63,7 +63,6 @@ intenum_to_name = {
     ARM: 'ARM',
 }
 
-
 def get_name(intenum):
     return intenum_to_name[intenum]
 
@@ -71,7 +70,7 @@ def get_name(intenum):
 # Muting data in an (Int)Enum is not expected behavior, so:
 serial_devices = {
     UART: UARTCommunicator(config, serial_dev_path=False, warn=False),
-    USB: None,  # XXX: Replace when USBComm. is ready
+    USB: None,  # XXX: Replace when USBCommunicator is ready
     BRD: None,
     SPM: None,
     ARM: None,
@@ -84,7 +83,7 @@ ap = argparse.ArgumentParser(description='Control script for minipc',
                              'test_board_crc:0o2, '
                              'test_board_typea:0o1')
 # TODO: allow numeric
-ap.add_argument('-v', '--verbosity',
+ap.add_argument('-v', '--verbosity', '--verbose',
                 action='store',
                 default='WARNING',
                 nargs='?',
@@ -114,10 +113,11 @@ ap.add_argument('-V', '--version',
                 action='version',
                 version='%(prog)s 0.1')
 
+# 赛博跳大神
+in_use = AtomicList()
 
 def is_uart(dev):
     return dev >= UART
-
 
 def is_usb(dev):
     return dev <= USB
@@ -125,125 +125,104 @@ def is_usb(dev):
 #
 # For unwrapped packets
 #
-
-
-def write_packet_uw(cmd_id, data, dev=UART):
-    if is_uart(dev):
-        uart = serial_devices[dev]
+def write_packet_uw(cmd_id, data, devname=UART):
+    if is_uart(devname):
+        uart = serial_devices[devname]
         unwrapped_packet = uart.create_packet(cmd_id, data)
-    elif is_usb(dev):
-        usb = serial_devices[dev]
+    elif is_usb(devname):
+        usb = serial_devices[devname]
         unwrapped_packet = None
     else:
-        logger.error(f'Failed to encode: not a serial device: {dev}')
+        logger.error(f'Failed to encode: not a serial device: {devname}')
     return unwrapped_packet
 
-
-def send_packet_uw(packet, dev=UART):
-    if is_uart(dev):
-        uart = serial_devices[dev]
+def send_packet_uw(packet, devname=UART):
+    if is_uart(devname):
+        uart = serial_devices[devname]
         send_ret = uart.send_packet(packet)
-    elif is_usb(dev):
-        usb = serial_devices[dev]
+    elif is_usb(devname):
+        usb = serial_devices[devname]
         send_ret = None
     else:
-        logger.error(f'Failed to send: not a serial device: {dev}')
+        logger.error(f'Failed to send: not a serial device: {devname}')
     return send_ret
 
-
-def write_send_packet_uw(cmd_id, data, dev=UART):
-    unwrapped_packet = write_packet_uw(cmd_id, data, dev)
+def write_send_packet_uw(cmd_id, data, devname=UART):
+    unwrapped_packet = write_packet_uw(cmd_id, data, devname)
     send_ret = send_packet_uw(unwrapped_packet)
     return (unwrapped_packet, send_ret)
 #
 # For wrapped packets
 #
-
-
-def write_packet(cmd_id, data, dev=UART, dump=False):
-    if is_uart(dev):
-        uart = serial_devices[dev]
+def write_packet(cmd_id, data, devname=UART, dump=False):
+    if is_uart(devname):
+        uart = serial_devices[devname]
         packet = UARTPacket(cmd_id, data, uart)
-    elif is_usb(dev):
-        usb = serial_devices[dev]
+    elif is_usb(devname):
+        usb = serial_devices[devname]
         packet = None
     else:
-        logger.error(f'Failed to encode Packet: not a serial device: {dev}')
+        logger.error(f'Failed to encode Packet: not a serial device: {devname}')
 
     if packet is not None and dump:
         logging.debug(packet.dump_self(dump))
 
     return packet
 
-
-def send_packet(packet, dev=UART, dump=False):
+def send_packet(packet, devname=UART, dump=False):
     if dump:
         logging.debug(packet.dump_self(dump))
 
-    if is_uart(dev):
-        uart = serial_devices[dev]
+    if is_uart(devname):
+        uart = serial_devices[devname]
         send_ret = uart.send_packet(packet.contents)
-    elif is_usb(dev):
-        usb = serial_devices[dev]
+    elif is_usb(devname):
+        usb = serial_devices[devname]
         send_ret = None
     else:
-        logger.error(f'Failed to send Packet: not a serial device: {dev}')
+        logger.error(f'Failed to send Packet: not a serial device: {devname}')
 
     return send_ret
 
-# XXX: currently only latency, crc modified to work
-
-
-def startup_tests(verb: oct = 0o10):
-    # [(test, how the test should be run),]
-    # tests should be an octal value:
-    _tst_tup = namedtuple('TestTuple', 'action device')
-    testable = [_tst_tup(communicator.test_board_latency, BRD),   # 0o10
-                _tst_tup(communicator.test_board_pingpong, BRD),  # 0o4
-                _tst_tup(communicator.test_board_crc, BRD),       # 0o2
-                _tst_tup(communicator.test_board_typea, BRD)      # 0o1
-                ]
-    # Convert octal to binary representation and run tests.
-    # i.e. oct(0o16) -> '001110' runs test_board_{latency,pingpong,crc}.
-    selected_tests, selected_tests_return = [], []
-    lst = str(format(verb, '#06b')[2:])
-    for i in range(min(len(lst), len(testable))):
-        if lst[i] == '1':
-            selected_tests += [testable[i]]
-    for tup in selected_tests:
-        dev = serial_devices[tup.device]
-        selected_tests_return += [tup.action(dev)]
-
-    return selected_tests_return
-
-
-def receive_packet(dev=UART):
-    if is_uart(dev):
-        uart = serial_devices[dev]
-        if dev in (UART, BRD):
+def receive_packet(devname=UART):
+    if is_uart(devname):
+        uart = serial_devices[devname]
+        if devname in (UART, BRD):
             return uart.get_current_stm32_state()
         else:
             return None
-    elif is_usb(dev):
+    elif is_usb(devname):
         return None
     else:
         logger.error(f'Failed to receive packet: not a serial device: {dev}')
 
+def oct_to_bin_to_str(o: oct) -> str:
+    return str(bin(o))[2:]
+
+# XXX: currently only latency, crc modified to work
+def startup_tests(testable: tuple, verb: oct = 0o10):
+    # Convert octal to binary representation and run tests.
+    # i.e. oct(0o16) -> '001110' runs test_board_{latency,pingpong,crc}.
+    lst = oct_to_bin_to_str(verb)
+    selected_tests = [t
+                      for b, t in zip(lst, testable)
+                      if b == '1']
+    return [action(serial_devices[devname])
+            for action, devname in selected_tests]
 
 def assign_device(dev_type, *args, **kwargs):
     if is_uart(dev_type):
-        return UARTCommunicator(*args, **kwargs)
+        return UARTCommunicator(in_use=in_use, *args, **kwargs)
     elif is_usb(dev_type):
-        # XXX: Replace when USBComm. is ready
-        return UARTCommunicator(*args, **kwargs)
+        # XXX: Replace when USBCommunicator is ready
+        return UARTCommunicator(in_use=in_use, *args, **kwargs)
     else:
         logger.error(f'Failed to encode: not a serial device: {dev}')
 
 # TODO: Add `udevadm` integration?
-
-
 def perform_plug_test(
-        *args: (Dev, Communicator)) -> [Communicator]:
+        *args: (DeviceName, Communicator)) -> [Communicator]:
+    logger.info(f'Not all paths were given, continuing on to plug test.')
     dev_lst = [tup[0] for tup in args]
     srl_lst = [tup[1] for tup in args]
     dev_srl_lst = [*args]
@@ -258,45 +237,50 @@ def perform_plug_test(
         return srl_lst
 
     ret_list = []  # Of serial devices
+    blacklisted_ports = set((None,))  # Ports to ignore
     print(f'==> Please {YELLOW}_unplug_{RESET} all devices to be assigned.')
     input('=> (enter to continue) ')
     for dev, srl in dev_srl_lst:
-        blacklisted_devices = [
+        blacklisted_ports.add(
             *UARTCommunicator.list_uart_device_paths(),
             # XXX: Replace when USBComm. is ready
             # *USBCommunicator.list_usb_device_paths())
-        ]
-        print(f'==> Blacklisted possible devices: {blacklisted_devices}')
+            )
+        print(f'=> Possible ports in blacklist: {blacklisted_ports}')
         print(f'==> Please {GREEN}_plug_{RESET} the {get_name(dev)}.')
         input('=> (enter to continue) ')
-        new_devices = [
+        new_ports = [
             *UARTCommunicator.list_uart_device_paths(),
             # XXX: Replace when USBComm. is ready
             # *USBCommunicator.list_usb_device_paths())
         ]
-        new_devices = [d for d in new_devices if d not in blacklisted_devices]
-        if not new_devices:
+        new_ports = [d for d in new_ports if d not in blacklisted_ports]
+        if not new_ports:
             print(f'==> {YELLOW}No new devices found, '
                   f'assigning to serialless device.{RESET}')
             ret_list += [assign_device(dev, config, serial_dev_path=False)]
         else:
-            if (_len := len(new_devices)) > 1:
+            if (_len := len(new_ports)) > 1:
                 print(f'==> {YELLOW}More than one device found.{YELLOW}')
                 print('==> It may be helpful to enter a number:')
                 print('\n'.join([*map(lambda t: f'=> {t[0]+1}: {t[1]}',
-                                      enumerate(new_devices))]))
+                                      enumerate(new_ports))]))
                 _nd_ind = input(f'=> (1 through {_len}) ')
-                print(f'=> {GREEN}Using device: {new_devices[_nd_ind]}{RESET}')
-                new_device = new_devices[_nd_ind]
+                print(f'=> {GREEN}Using device: {new_ports[_nd_ind]}{RESET}')
+                new_device = new_ports[_nd_ind]
             else:
-                print(f'=> {GREEN}Using device: {new_devices[0]}{RESET}')
-                new_device = new_devices[0]
+                print(f'=> {GREEN}Using device: {new_ports[0]}{RESET}')
+                new_device = new_ports[0]
             ret_list += [assign_device(dev, config, serial_dev_path=new_device)]
     print('\n==> New port assignments:')
     for dev, srl in zip(dev_lst, ret_list):
         print(f'=> {get_name(dev):<15} %s' %
               (f'{RED}(no port assigned){RESET}' if
                (b := not srl.serial_port) else srl.serial_port))
+    print(f'\n{GREEN}{BOLD}==> Do you want to continue with this '
+          f'configuration?{NOBOLD}{RESET}')
+    perform_plug_test(*dev_srl_lst) if \
+            input('=> (NO to retry) ') == 'NO' else None
     print()
 
     return ret_list
@@ -308,17 +292,18 @@ def set_up_loggers(loggers):
     for lgr in loggers:
         lgr.handlers.clear()
         lgr.addHandler(ch)
-        lgr.setLevel(parsed_args.verbosity or 'DEBUG')
+        lgr.setLevel(parsed_args.verbosity or 'INFO')
 
 
 def set_up_devices(
-        *args: (Dev, str), plug_test) -> [Communicator or None]:
+        *args: (DeviceName, str), plug_test) -> [Communicator or None]:
     dev_lst = [tup[0] for tup in args]
     pth_lst = [tup[1] for tup in args]
     dev_pth_lst = [*args]
 
     ret_list = []  # Of serial devices or None
     for dev, pth in dev_pth_lst:
+        logger.info(f'Setting up {get_name(dev)} (given path {pth})')
         if pth is not None:
             ret_list += [assign_device(
                 dev, config, serial_dev_path=pth)]
@@ -334,7 +319,15 @@ def main(args):
     ########################
     # Run self check tests #
     ########################
-    startup_tests(int(args.test, 8))
+    # [(test, how the test should be run),]
+    # tests should be an octal value:
+    testable = [(communicator.test_board_latency, BRD),   # 0o10
+                (communicator.test_board_pingpong, BRD),  # 0o4
+                (communicator.test_board_crc, BRD),       # 0o2
+                (communicator.test_board_typea, BRD),     # 0o1
+                ]
+    # str -> oct
+    startup_tests(testable, int(args.test, 8))
     if parsed_args.test_only:
         exit(0)
 
@@ -376,7 +369,7 @@ if __name__ == '__main__':
     """ Items in parsed_args:
     parsed_args.verbosity :: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
                                                         (d. WARNING,
-                                                         w/o arg DEBUG)
+                                                         w/o arg INFO)
     parsed_args.plug_test :: bool
     parsed_args.board_port :: '/path/to/some/port'      (d. None)
     parsed_args.spacemouse_port :: '/path/to/some/port' (d. None)

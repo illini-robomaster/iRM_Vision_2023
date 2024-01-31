@@ -36,7 +36,9 @@ class UARTCommunicator:
             crc_standard=crc.Crc8.MAXIM_DOW,
             endianness='little',
             warn=True,
-            serial_dev_path=None, # None -> guess port, False -> port=None
+            serial_dev_path=None,  # None -> guess port, False -> port=None
+            serial_dev=None,       # None -> ^^^^^^^^^^
+            in_use=None,
             buffer_size=STJ_MAX_PACKET_SIZE * 100):
         """Initialize the UART communicator.
 
@@ -54,14 +56,23 @@ class UARTCommunicator:
 
         self.warn = warn
 
-        if serial_dev_path is None:
-            self.use_uart_device(self.guess_uart_device_())
-        elif not serial_dev_path:
-            self.use_uart_device(None)
+        if in_use is None:
+            if self.warn:
+                logger.warning('Did not receive a list of ports in use, assuming none.')
+            in_use = []
+
+        if serial_dev is None:
+            if serial_dev_path is None:
+                self.use_uart_device(self.guess_uart_device_(in_use=in_use), in_use=in_use)
+            elif not serial_dev_path:
+                self.use_uart_device_path(None, in_use=in_use)
+            else:
+                if serial_dev_path == '/dev/tty' and self.warn:
+                    logger.warn('Using special device file `/dev/tty\': is this really expected?')
+                self.use_uart_device_path(serial_dev_path, in_use=in_use)
         else:
-            if serial_dev_path == '/dev/tty' and self.warn:
-                logger.warn('Using special device file `/dev/tty\': is this really expected?')
-            self.use_uart_device(serial_dev_path)
+            self.use_uart_device_path(serial_dev, in_use=in_use)
+
 
         self.circular_buffer = []
         self.buffer_size = buffer_size
@@ -155,12 +166,28 @@ class UARTCommunicator:
         if self.serial_port is not None:
             self.serial_port.write(packet)
 
-    def use_uart_device(self, dev_path):
-        serial_port = UARTCommunicator.try_uart_device(dev_path)
-        logger.debug(f'I ({self.__class__=}) am using port {serial_port}.')
-        if serial_port is None and self.warn:
-            logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+    def use_uart_device_path(self, dev_path, in_use):
+        if dev_path in in_use:
+            logger.warning('{dev_path} already in use: is this really expected?')
+        serial_port = UARTCommunicator.try_uart_device(dev_path, in_use)
+        logger.info(f'I ({self.__class__=}) am using {serial_port}.')
+        if serial_port is None:
+            if self.warn:
+                logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+        else:
+            in_use += [serial_port.port]
         self.serial_port = serial_port
+
+    def use_uart_device(self, dev, in_use):
+        if dev is None:
+            if self.warn:
+                logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+        elif dev.port in in_use:
+            logger.warning('{dev.port} already in use: is this really expected?')
+        else:
+            in_use += [serial_port.port]
+        logger.info(f'I ({self.__class__=}) am using {dev}.')
+        self.serial_port = dev
 
     @staticmethod
     def list_uart_device_paths():
@@ -185,8 +212,10 @@ class UARTCommunicator:
         return dev_paths or [None]
 
     @staticmethod
-    def try_uart_device(dev_path):
-        logger.debug(f'Trying to open serial on path: {dev_path}')
+    def try_uart_device(dev_path, in_use):
+        if dev_path in in_use:
+            logger.error(f'Path {dev_path} already in use, returning None.')
+            return None
         # Fails with serial.serialutil.SerialException
         serial_port = serial.Serial(
             port=dev_path,
@@ -196,15 +225,15 @@ class UARTCommunicator:
             stopbits=serial.STOPBITS_ONE,
         )
         if serial_port.port is not None:
-            logger.debug(f'Successfully opened serial on path: {dev_path}')
+            logger.info(f'Successfully opened serial on path: {dev_path}')
             return serial_port
         else:
-            logger.debug(f'Failed to open serial on path: {dev_path}, '
+            logger.info(f'Failed to open serial on path: {dev_path}, '
                          'returning None object instead.')
             return None
 
     @staticmethod
-    def guess_uart_device_():
+    def guess_uart_device_(in_use):
         """Guess the UART device path and open it.
 
         Note: this function is for UNIX-like systems only!
@@ -215,15 +244,18 @@ class UARTCommunicator:
         Returns:
             serial.Serial: the serial port object
         """
-        logger.debug('I will now try to guess a uart device.')
+        logger.info('I will now try to guess a uart device.')
         # list of possible prefixes
         dev_paths = UARTCommunicator.list_uart_device_paths()
 
         serial_port = None # ret val
         for dev_path in dev_paths:
+            if dev_path in in_use:
+                logger.info(f'Guessed {dev_path} but it is already in use, skipping.')
+                continue
             if dev_path is not None:
                 try:
-                    serial_port = UARTCommunicator.try_uart_device(dev_path)
+                    serial_port = UARTCommunicator.try_uart_device(dev_path, in_use=in_use)
 
                 except serial.serialutil.SerialException:
                     print('Could not open serial port, skipping...')
@@ -562,9 +594,10 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
     receive_thread.join()
     receive_time, receive_packet_status = rt_return
     # Flatten data
-    not_all_received = False if all(receive_packet_status) else True
-    latencies = [*map(lambda tup:(tup[1] or tup[0])-tup[0],
-                      zip(send_time, receive_time))] # 0 if packet not received
+    not_all_received = not all(receive_packet_status)
+    # 0 if packet not received
+    latencies = [(tf or ti) - ti
+                 for tf, ti in zip(send_time, receive_time)]
     statuses = [*zip(send_packet_status, receive_packet_status)]
 
     loss = latencies.count(0.0)
@@ -584,7 +617,7 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
     print(f'Packets lost: {loss}/{loss/rounds*100}%. '
           f'Average latency: {average_latency}')
     if not_all_received:
-        logger.warning('Not all packets were received.')
+        logger.warning('Latency test: not all packets were received.')
 
     return {'average' : average_latency,
             'loss' : (loss, loss/rounds),
@@ -716,7 +749,7 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
     receive_thread.join()
     receive_packet_status = rt_return[0]
     # Flatten data
-    not_all_received = False if all(receive_packet_status) else True
+    not_all_received = not all(receive_packet_status)
     statuses = [*zip(send_packet_status, receive_packet_status)]
 
     loss = receive_packet_status.count(False)
@@ -727,7 +760,7 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
     print(f'Packets lost: {loss}/{loss/rounds*100}%.')
 
     if not_all_received:
-        logger.warning('Not all packets were received.')
+        logger.warning('Crc test: not all packets were received.')
 
     return {'loss' : (loss, loss/rounds),
             'detailed' : statuses}
