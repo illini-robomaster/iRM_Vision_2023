@@ -169,25 +169,26 @@ class UARTCommunicator:
     def use_uart_device_path(self, dev_path, in_use):
         if dev_path in in_use:
             logger.warning('{dev_path} already in use: is this really expected?')
-        serial_port = UARTCommunicator.try_uart_device(dev_path, in_use)
-        logger.info(f'I ({self.__class__=}) am using {serial_port}.')
-        if serial_port is None:
-            if self.warn:
-                logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
-        else:
-            in_use += [serial_port.port]
-        self.serial_port = serial_port
-
-    def use_uart_device(self, dev, in_use):
+        dev = UARTCommunicator.try_uart_device(dev_path, in_use)
         if dev is None:
             if self.warn:
                 logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
-        elif dev.port in in_use:
-            logger.warning('{dev.port} already in use: is this really expected?')
         else:
-            in_use += [serial_port.port]
+            in_use += [dev.port]
         logger.info(f'I ({self.__class__=}) am using {dev}.')
         self.serial_port = dev
+
+    def use_uart_device(self, dev, in_use):
+        try:
+            if dev.port in in_use:
+                logger.warning('{dev.port} already in use: is this really expected?')
+            else:
+                in_use += [dev.port]
+        except AttributeError:  # dev is None
+            logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+        finally:
+            logger.info(f'I ({self.__class__=}) am using {dev}.')
+            self.serial_port = dev
 
     @staticmethod
     def list_uart_device_paths():
@@ -199,7 +200,7 @@ class UARTCommunicator:
         Jetson / Linux prefix: "ttyUSB", "ttyACM"
 
         Returns:
-            [dev_path] : a list of possible device paths
+            [Maybe dev_path] : a list of possible device paths
         """
         # list of possible prefixes
         UART_PREFIX_LIST = ("tty.usbmodem", "ttyUSB", "ttyACM")
@@ -212,6 +213,7 @@ class UARTCommunicator:
         return dev_paths or [None]
 
     @staticmethod
+    # path -> [path] -> Maybe serial.Serial
     def try_uart_device(dev_path, in_use):
         if dev_path in in_use:
             logger.error(f'Path {dev_path} already in use, returning None.')
@@ -233,6 +235,7 @@ class UARTCommunicator:
             return None
 
     @staticmethod
+    # [path] -> Maybe serial.Serial
     def guess_uart_device_(in_use):
         """Guess the UART device path and open it.
 
@@ -248,7 +251,7 @@ class UARTCommunicator:
         # list of possible prefixes
         dev_paths = UARTCommunicator.list_uart_device_paths()
 
-        serial_port = None # ret val
+        serial_port = None  # ret val
         for dev_path in dev_paths:
             if dev_path in in_use:
                 logger.info(f'Guessed {dev_path} but it is already in use, skipping.')
@@ -256,12 +259,10 @@ class UARTCommunicator:
             if dev_path is not None:
                 try:
                     serial_port = UARTCommunicator.try_uart_device(dev_path, in_use=in_use)
-
+                    if serial_port is not None:
+                        return serial_port
                 except serial.serialutil.SerialException:
                     print('Could not open serial port, skipping...')
-
-                if serial_port is not None:
-                    return serial_port
         return serial_port
 
     def packet_search(self):
@@ -560,7 +561,7 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
 
         return (send_time, packet_status)
 
-    def receive_packets(rounds, timeout, ret): # Async
+    def receive_packets(rounds, timeout, ret):  # Async
         received = 0
         receive_time = [0] * rounds
         packet_status = [False] * rounds
@@ -571,13 +572,12 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
             if uart.packet_search():
                 received_data = uart.get_current_stm32_state()
                 i = int(received_data['rel_yaw'])
-                # vx acts as an index
+                # rel_yaw and rel_pitch act as (the same) index,
                 receive_time[i] = time.time()
                 logger.debug(f'Received packet #{i} from stm32...')
                 received += 1
             time.sleep(0.001) # Use same frequency as listen_.
-        for it in enumerate(receive_time):
-            i, t = it
+        for i, t in enumerate(receive_time):
             if t != 0:
                 packet_status[i] = True
 
@@ -597,7 +597,7 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
     not_all_received = not all(receive_packet_status)
     # 0 if packet not received
     latencies = [(tf or ti) - ti
-                 for tf, ti in zip(send_time, receive_time)]
+                 for ti, tf in zip(send_time, receive_time)]
     statuses = [*zip(send_packet_status, receive_packet_status)]
 
     loss = latencies.count(0.0)

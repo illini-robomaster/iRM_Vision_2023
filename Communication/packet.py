@@ -35,7 +35,10 @@ class UARTPacket():
                 ret += [self.dumpable[i]]
         return ret
 
-class USBPacket():
+class USBPacket:
     def __init__(self):
         pass
 
+
+class Packet:
+    pass
