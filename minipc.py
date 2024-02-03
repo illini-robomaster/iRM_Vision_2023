@@ -21,8 +21,10 @@
 """
 import sys
 import time
+import serial
 import logging
 import argparse
+import threading
 from enum import IntEnum
 from typing import Optional, Union, \
                    Sequence, Tuple, List, \
@@ -39,7 +41,6 @@ from Utils.atomiclist import AtomicList
 
 from Communication import communicator
 from Communication.communicator import UARTCommunicator, USBCommunicator
-from Communication.packet import UARTPacket, USBPacket
 
 # Add loggers here
 loggers = [logger := logging.getLogger(__name__),
@@ -50,10 +51,10 @@ loggers = [logger := logging.getLogger(__name__),
 class DeviceType(IntEnum):
     UART = 1  # serialless uart, also acts to `type' others
     BRD = 2  # board
-    SPM = 3  # spacemouse
 
     USB = 0  # serialless usb, also acts to `type' others
-    ARM = -1  # arm
+    SPM = -1  # spacemouse
+    ARM = -2  # arm
 
 
 UART = DeviceType.UART
@@ -70,9 +71,10 @@ intenum_to_name = {
     ARM: 'ARM',
 }
 
-def get_name(intenum: DeviceType) -> str:
+def dname(intenum: DeviceType) -> str:
     return intenum_to_name[intenum]
 
+# This is expected to be thread-safe.
 # Muting data in an (Int)Enum is not expected behavior, so:
 serial_devices: Dict[DeviceType, 'Communicator'] = {
     UART: UARTCommunicator(config, serial_dev_path=False, warn=False),
@@ -109,17 +111,19 @@ ap.add_argument('-A', '--arm-port',
                 default=None)
 ap.add_argument('-t', '--test', action='store', default='0o10',
                 help='takes an octal value; values below')
-ap.add_argument('--skip-tests',
+ap.add_argument('-s', '--skip-tests',
                 action='store_true',
                 help='alias for --test 0')
 ap.add_argument('--test-only',
                 action='store_true',
                 help='exit after completing tests')
+ap.add_argument('--exit-on-detach',
+                action='store_true',
+                help='exit if no devices are attatched')
 ap.add_argument('-V', '--version',
                 action='version',
                 version='%(prog)s 0.1')
 
-# 赛博跳大神
 in_use = AtomicList()
 
 def is_uart(dev_type: DeviceType) -> bool:
@@ -128,101 +132,59 @@ def is_uart(dev_type: DeviceType) -> bool:
 def is_usb(dev_type: DeviceType) -> bool:
     return dev_type <= USB
 
+def get_device(dev_type: DeviceType) -> 'Communicator':
+    return serial_devices[dev_type]
+
+def assign_device(dev_type: DeviceType, device: 'Communicator') -> None:
+    serial_devices[dev_type] = device
+
+def deassign_device(dev_type: DeviceType) -> None:
+    dev_path = get_device(dev_type).serial_port.port
+    assign_device(dev_type, None)
+    in_use.remove(dev_path)
+
 #
 # For unwrapped packets
 #
-def write_packet_uw(
-        cmd_id: hex, data: dict, dev_type=UART) -> bytes:
-    if is_uart(dev_type):
-        uart = serial_devices[dev_type]
-        unwrapped_packet = uart.create_packet(cmd_id, data)
-    elif is_usb(dev_type):
-        usb = serial_devices[dev_type]
-        unwrapped_packet = None
-    else:
-        logger.error(f'Failed to encode: not a serial device: {dev_type}')
-    return unwrapped_packet
-
-def send_packet_uw(packet: bytes, dev_type=UART) -> None:
-    if is_uart(dev_type):
-        uart = serial_devices[dev_type]
-    elif is_usb(dev_type):
-        usb = serial_devices[dev_type]
-    else:
-        logger.error(f'Failed to send: not a serial device: {dev_type}')
-
-def write_send_packet_uw(
-        cmd_id: hex, data: dict, dev_type=UART) -> bytes:
-    unwrapped_packet = write_packet_uw(cmd_id, data, dev_type)
-    send_packet_uw(unwrapped_packet)
-    return unwrapped_packet
-#
-# For wrapped packets
-#
 def write_packet(
-        cmd_id: hex, data: dict, dev_type=UART, dump=False) -> 'Packet':
-    if is_uart(dev_type):
-        uart = serial_devices[dev_type]
-        packet = UARTPacket(cmd_id, data, uart)
-    elif is_usb(dev_type):
-        usb = serial_devices[dev_type]
-        packet = None
-    else:
-        logger.error(f'Failed to encode Packet: not a serial device: {dev_type}')
+        dev_type: DeviceType, cmd_id: hex, data: dict) -> bytes:
+    dev = get_device(dev_type)
+    return dev.create_packet(cmd_id, data)
 
-    if packet is not None and dump:
-        logging.debug(packet.dump_self(dump))
-
-    return packet
-
-def send_packet(
-        packet: 'Packet', dev_type=UART, dump=False) -> None:
-    if dump:
-        logging.debug(packet.dump_self(dump))
-
-    if is_uart(dev_type):
-        uart = serial_devices[dev_type]
-        uart.send_packet(packet.contents)
-    elif is_usb(dev_type):
-        usb = serial_devices[dev_type]
-        #usb.send_packet(packet.contents)
-    else:
-        logger.error(f'Failed to send Packet: not a serial device: {dev_type}')
+def send_packet(dev_type: DeviceType, packet: bytes) -> None:
+    dev = get_device(dev_type)
+    return dev.send_packet(packet)
 
 def write_send_packet(
-        cmd_id: hex, data: dict, dev_type=UART) -> bytes:
-    unwrapped_packet = write_packet_uw(cmd_id, data, dev_type)
-    send_packet_uw(unwrapped_packet)
-    return unwrapped_packet
+        dev_type: DeviceType, cmd_id: hex, data: dict) -> None:
+    dev = get_device(dev_type)
+    return dev.create_and_send_packet(cmd_id, data)
 
 def receive_packet(dev_type=UART) -> Optional[dict]:
-    if is_uart(dev_type):
-        uart = serial_devices[dev_type]
-        if dev_type in (UART, BRD):
-            return uart.get_current_stm32_state()
-        else:
-            return None
-    elif is_usb(dev_type):
+    dev = get_device(dev_type)
+    if dev_type in (UART, BRD):
+        return dev.get_current_stm32_state()
+    elif dev_type in (USB, SPM, ARM):
         return None
     else:
         logger.error(f'Failed to receive packet: not a serial device: {dev}')
 
-def oct_bin_to_str(o: oct) -> str:
-    return str(bin(o))[2:]  # Remove `0b'
+# e.g. ''.join( oct_bin_to_str_rev(0o12) ) == '0101'
+def oct_bin_to_str_rev(o: oct) -> str:
+    return reversed(str(bin(o))[2:])  # Remove `0b'
 
-# XXX: currently only latency, crc modified to work
 def startup_tests(
         testable: List[Tuple[Callable, DeviceType]], verb=0o10) -> None:
     # Convert octal to binary representation and run tests.
-    # i.e. oct(0o16) => '001110' runs test_board_{latency,pingpong,crc}.
-    lst = oct_bin_to_str(verb)
+    # i.e. oct(0o16) => '0111' runs test_board_{latency,pingpong,crc}.
+    lst = oct_bin_to_str_rev(verb)
     selected_tests = [t
                       for b, t in zip(lst, testable)
                       if b == '1']
-    return [action(serial_devices[dev_type])
+    return [action(get_device(dev_type))
             for action, dev_type in selected_tests]
 
-def assign_device(
+def get_communicator(
         dev_type: DeviceType, *args, **kwargs) -> 'Communicator':
     if is_uart(dev_type):
         return UARTCommunicator(in_use=in_use, *args, **kwargs)
@@ -239,7 +201,7 @@ def perform_plug_test(
     d_t_dev_lst: List[Tuple[DeviceType, 'Communicator']] = [*args]
     print('==> Current serial assignments:')
     for d_t, dev in d_t_dev_lst:
-        print(f'=> {get_name(d_t):<15} %s' %
+        print(f'=> {dname(d_t):<15} %s' %
               f'{RED}(no device){RESET}'
               if not dev
               else dev.serial_port)
@@ -262,7 +224,7 @@ def perform_plug_test(
             # *USBCommunicator.list_usb_device_paths())
             )
         print(f'=> Possible ports in blacklist: {blacklisted_ports}')
-        print(f'==> Please {GREEN}_plug_{RESET} the {get_name(d_t)}.')
+        print(f'==> Please {GREEN}_plug_{RESET} the {dname(d_t)}.')
         input('=> (enter to continue) ')
         new_ports: List['path'] = [
             *UARTCommunicator.list_uart_device_paths(),
@@ -287,12 +249,12 @@ def perform_plug_test(
         else:
             print(f'=> {GREEN}Using device: {new_ports[0]}{RESET}')
             srl_dev_pth = new_ports[0]
-        new_dev_lst += [assign_device(d_t, config, serial_dev_path=srl_dev_pth)]
+        new_dev_lst += [get_communicator(d_t, config, serial_dev_path=srl_dev_pth)]
     print('\n==> New serial assignments:')
     for d_t, dev in zip([t for t, _ in d_t_dev_lst], new_dev_lst):
-        print(f'=> {get_name(d_t):<15} %s' %
+        print(f'=> {dname(d_t):<15} %s' %
               (f'{YELLOW}(no serial port assigned){RESET}'
-               if not dev.serial_port
+               if not dev.is_valid()
                else dev.serial_port))
     print(f'\n{GREEN}{BOLD}==> Do you want to continue with this '
           f'configuration?{NOBOLD}{RESET}')
@@ -304,13 +266,13 @@ def perform_plug_test(
     return new_dev_lst
 
 def set_up_loggers(
-        loggers: List[logging.Logger]) -> None:
+        loggers: List[logging.Logger], verbosity) -> None:
     ch = logging.StreamHandler()
     ch.setFormatter(cl.ColorFormatter())
     for lgr in loggers:
         lgr.handlers.clear()
         lgr.addHandler(ch)
-        lgr.setLevel(parsed_args.verbosity or 'INFO')
+        lgr.setLevel(verbosity or 'INFO')
 
 def set_up_devices(*args: Tuple[DeviceType, str],
                    plug_test: bool) -> Optional['Communicator']:
@@ -319,31 +281,30 @@ def set_up_devices(*args: Tuple[DeviceType, str],
 
     ret_list = []  # Of serial devices or None
     for dev, pth in dev_pth_zip:
-        logger.info(f'Setting up {get_name(dev)} (given path {pth})')
+        logger.info(f'Setting up {dname(dev)} (given path {pth})')
         if pth is not None:
-            ret_list += [assign_device(
-                dev, config, serial_dev_path=pth)]
+            ret_list += [get_communicator(dev, config, serial_dev_path=pth)]
         elif not plug_test:
-            ret_list += [assign_device(dev, config)]
+            ret_list += [get_communicator(dev, config)]
         else:
             ret_list += [None]
 
     return ret_list
 
-def main(args) -> None:
+def main(pa) -> None:
     #
     # Run self check tests
     #
-    testable: List[Tuple[Callable, DeviceType]] = [
-            (communicator.test_board_latency, BRD),   # 0o10
-            (communicator.test_board_pingpong, BRD),  # 0o4
-            (communicator.test_board_crc, BRD),       # 0o2
-            (communicator.test_board_typea, BRD),     # 0o1
-            ]
-    startup_tests(testable, int(args.test, 8))
-    if parsed_args.test_only:
+    if not pa.skip_tests:
+        testable: List[Tuple[Callable, DeviceType]] = [
+                (communicator.test_board_typea, BRD),     # 0o1
+                (communicator.test_board_crc, BRD),       # 0o2
+                (communicator.test_board_pingpong, BRD),  # 0o4
+                (communicator.test_board_latency, BRD),   # 0o10
+                ]
+        startup_tests(testable, int(pa.test, 8))
+    if pa.test_only:
         exit(0)
-
     #
     # Begin listening
     #
@@ -351,9 +312,9 @@ def main(args) -> None:
             (dev_type, dev)
             for dev_type, dev in serial_devices.items()
             if dev is not None
-            if dev.serial_port is not None]
+            if dev.is_valid()]
 
-    if not listening_devices:
+    if not listening_devices and pa.exit_on_detach:
         logger.error('No devices attatched: exiting...')
         exit(1)
     
@@ -362,21 +323,65 @@ def main(args) -> None:
             print(f'{intenum_to_name[dev_type]} listening on '
                   f'{dev.serial_port}')
 
+    def brd_sender():
+        while True:
+            # Get instructions from some atomic structure
+            #write_send_packet(cmd_id, data, BRD)
+            time.sleep(1/60)
+    def brd_listener():
+        while True:
+            time.sleep(1/120)
+    #def spm_sender():
+    #    while True:
+    #        time.sleep(1/60)
+    def spm_listener():
+        while True:
+            time.sleep(1/120)
+    #def arm_sender():
+    #    while True:
+    #        time.sleep(1/60)
+    def arm_listener():
+        while True:
+            time.sleep(1/120)
     #
     # Main loop
     #
-    # TODO: Everything
+    brd_sender_thread = threading.Thread(target=brd_sender)
+    brd_listener_thread = threading.Thread(target=brd_listener)
+    #spm_sender_thread = threading.Thread(target=spm_sender)
+    spm_listener_thread = threading.Thread(target=spm_listener)
+    #arm_sender_thread = threading.Thread(target=arm_sender)
+    arm_listener_thread = threading.Thread(target=arm_listener)
+
     j = 0
     while True:
         j += 1
-        cmd_id = config.SELFCHECK_CMD_ID
-        data = {'rel_yaw': j, 'rel_pitch': j,
-                'mode': 'EC', 'debug_int': j}
-        # packet = write_packet(cmd_id, data, BRD)
-        # send_packet(packet)
+        #cmd_id = config.SELFCHECK_CMD_ID
+        #data = {'mode': 'EC', 'debug_int': j}
+        cmd_id = config.ARM_CMD_ID
+        data = {
+            'floats': {'float0': 0.0,
+                       'float1': 1.0,
+                       'float2': 2.0,
+                       'float3': 3.0,
+                       'float4': 4.0,
+                       'float5': 5.0,
+            }
+        }
+        # TODO: Allow reconnecting, i.e. with id requests
+        try:
+            if get_device(BRD) is not None:
+                write_send_packet(BRD, cmd_id, data)
+                print(receive_packet(BRD))
+            else:
+                print('Nothing connected')
 
-        # print(receive_packet())
+        except serial.serialutil.SerialException:
+            logger.error(f'Lost connection to {dname(BRD)}!')
+            deassign_device(BRD)
+
         time.sleep(1)
+        
 
 if __name__ == '__main__':
     # Remove first arg if called with python.
@@ -398,11 +403,10 @@ if __name__ == '__main__':
     #############################
     #  Handle parsed arguments  #
     #############################
-    #  TODO: organize
     #
     # Set up logging.
     #
-    set_up_loggers(loggers)
+    set_up_loggers(loggers, parsed_args.verbosity)
     logger.debug(parsed_args)
 
     #
@@ -414,10 +418,7 @@ if __name__ == '__main__':
                        (SPM, parsed_args.spacemouse_port),
                        (ARM, parsed_args.arm_port),
                        plug_test=parsed_args.plug_test)
-
-    #
     # Plug test
-    #
     # *_dev :: UARTCommunicator
     # *_dev.serial_port :: serial.Serial
     # *_dev.serial_port.port :: Maybe 'path'
@@ -426,10 +427,9 @@ if __name__ == '__main__':
             perform_plug_test((BRD, brd_dev),
                               (SPM, spm_dev),
                               (ARM, arm_dev),)
-
-    serial_devices[BRD] = brd_dev
-    serial_devices[SPM] = spm_dev
-    serial_devices[ARM] = arm_dev
+    assign_device(BRD, brd_dev)
+    assign_device(SPM, spm_dev)
+    assign_device(ARM, arm_dev)
 
     ###########################
     #  End argument handling  #

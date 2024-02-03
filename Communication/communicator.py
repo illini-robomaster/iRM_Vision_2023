@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-#Host the UART communicator. See UARTCommunicator.
+# Host the UART communicator. See UARTCommunicator.
 #
 import os
 import sys
@@ -15,7 +15,7 @@ from copy import deepcopy
 logger = logging.getLogger(__name__)
 
 # STM32 to Jetson packet size
-STJ_MAX_PACKET_SIZE = 21
+STJ_MAX_PACKET_SIZE = 33
 STJ_MIN_PACKET_SIZE = 10
 
 
@@ -37,7 +37,8 @@ class UARTCommunicator:
             endianness='little',
             warn=True,
             serial_dev_path=None,  # None -> guess port, False -> port=None
-            serial_dev=None,       # None -> ^^^^^^^^^^
+            serial_dev=None,       # None -> ^^^^^^^^^^, False -> ^^^^^^^^^
+            allow_serialless=True,
             in_use=None,
             buffer_size=STJ_MAX_PACKET_SIZE * 100):
         """Initialize the UART communicator.
@@ -61,18 +62,21 @@ class UARTCommunicator:
                 logger.warning('Did not receive a list of ports in use, assuming none.')
             in_use = []
 
-        if serial_dev is None:
-            if serial_dev_path is None:
-                self.use_uart_device(self.guess_uart_device_(in_use=in_use), in_use=in_use)
-            elif not serial_dev_path:
-                self.use_uart_device_path(None, in_use=in_use)
+        
+        if serial_dev_path is None:
+            if serial_dev is None:
+                self.use_uart_device(self.guess_uart_device_(in_use), in_use)
+            elif not serial_dev:
+                self.use_uart_device(None, in_use)
             else:
-                if serial_dev_path == '/dev/tty' and self.warn:
-                    logger.warn('Using special device file `/dev/tty\': is this really expected?')
-                self.use_uart_device_path(serial_dev_path, in_use=in_use)
+                self.use_uart_device(serial_dev, in_use)
+        elif not serial_dev_path:
+            self.use_uart_device_path(None, in_use)
         else:
-            self.use_uart_device_path(serial_dev, in_use=in_use)
+            self.use_uart_device_path(serial_dev_path, in_use)
 
+        if not allow_serialless and not self.is_vacuum():
+            raise serial.serialutil.SerialException
 
         self.circular_buffer = []
         self.buffer_size = buffer_size
@@ -87,6 +91,14 @@ class UARTCommunicator:
             'vx': 0,
             'vy': 0,
             'vw': 0,
+            'floats': {
+                'float0': 0.0,
+                'float1': 0.0,
+                'float2': 0.0,
+                'float3': 0.0,
+                'float4': 0.0,
+                'float5': 0.0,
+            }
         }
 
         self.parsed_packet_cnt = 0
@@ -118,6 +130,9 @@ class UARTCommunicator:
     def is_valid(self):
         """Return if communicator is valid."""
         return self.serial_port is not None
+
+    def is_vacuum(self):
+        return self.serial_port.port is None if self.is_valid() else True
 
     def try_read_one(self):
         """Try to copy from serial port to a circular buffer.
@@ -169,10 +184,10 @@ class UARTCommunicator:
     def use_uart_device_path(self, dev_path, in_use):
         if dev_path in in_use:
             logger.warning('{dev_path} already in use: is this really expected?')
-        dev = UARTCommunicator.try_uart_device(dev_path, in_use)
+        dev = UARTCommunicator.try_uart_device_(dev_path, in_use)
         if dev is None:
             if self.warn:
-                logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+                logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACUUM!")
         else:
             in_use += [dev.port]
         logger.info(f'I ({self.__class__=}) am using {dev}.')
@@ -185,7 +200,7 @@ class UARTCommunicator:
             else:
                 in_use += [dev.port]
         except AttributeError:  # dev is None
-            logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACCUM!")
+            logger.warning("NO SERIAL DEVICE FOUND! WRITING TO VACUUM!")
         finally:
             logger.info(f'I ({self.__class__=}) am using {dev}.')
             self.serial_port = dev
@@ -214,7 +229,7 @@ class UARTCommunicator:
 
     @staticmethod
     # path -> [path] -> Maybe serial.Serial
-    def try_uart_device(dev_path, in_use):
+    def try_uart_device_(dev_path, in_use):
         if dev_path in in_use:
             logger.error(f'Path {dev_path} already in use, returning None.')
             return None
@@ -258,7 +273,7 @@ class UARTCommunicator:
                 continue
             if dev_path is not None:
                 try:
-                    serial_port = UARTCommunicator.try_uart_device(dev_path, in_use=in_use)
+                    serial_port = UARTCommunicator.try_uart_device_(dev_path, in_use)
                     if serial_port is not None:
                         return serial_port
                 except serial.serialutil.SerialException:
@@ -316,10 +331,10 @@ class UARTCommunicator:
             self.stm32_state_dict['vy'] = ret_dict['data']['vy']
             self.stm32_state_dict['vw'] = ret_dict['data']['vw']
         elif ret_dict['cmd_id'] == self.cfg.SELFCHECK_CMD_ID:
-            self.stm32_state_dict['rel_yaw'] = ret_dict['data']['rel_yaw']
-            self.stm32_state_dict['rel_pitch'] = ret_dict['data']['rel_pitch']
             self.stm32_state_dict['debug_int'] = ret_dict['data']['debug_int']
             self.stm32_state_dict['mode'] = ret_dict['data']['mode']
+        elif ret_dict['cmd_id'] == self.cfg.ARM_CMD_ID:
+            self.stm32_state_dict['floats'] = ret_dict['data']['floats']
 
     def try_parse_one(self, possible_packet):
         """
@@ -414,19 +429,30 @@ class UARTCommunicator:
             data = {'my_color': my_color, 'enemy_color': enemy_color}
         # Parse Selfcheck data, CMD_ID = 0x03
         if cmd_id == self.cfg.SELFCHECK_CMD_ID:
-            # "<f" means little endian float
-            rel_yaw = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 0: self.cfg.DATA_OFFSET + 4]))[0]
-            rel_pitch = struct.unpack('<f', bytes(
-                possible_packet[self.cfg.DATA_OFFSET + 4: self.cfg.DATA_OFFSET + 8]))[0]
-            mode_int = int(possible_packet[self.cfg.DATA_OFFSET + 8])
+            mode_int = int(possible_packet[self.cfg.DATA_OFFSET + 0])
             mode = self.cfg.SELFCHECK_MODE[mode_int]
-            debug_int = int(possible_packet[self.cfg.DATA_OFFSET + 9])
+            debug_int = int(possible_packet[self.cfg.DATA_OFFSET + 1])
             data = {
-                'rel_yaw': rel_yaw,
-                'rel_pitch': rel_pitch,
                 'mode': mode,
                 'debug_int': debug_int}
+        # Parse Arm data, CMD_ID = 0x04
+        if cmd_id == self.cfg.ARM_CMD_ID:
+            # "<f" means little endian float
+            floats = {
+                'float0': 0.0,
+                'float1': 0.0,
+                'float2': 0.0,
+                'float3': 0.0,
+                'float4': 0.0,
+                'float5': 0.0,
+            }
+            for i, k in enumerate(floats.keys()):
+                floats[k] = struct.unpack('<f', bytes(
+                    possible_packet[self.cfg.DATA_OFFSET + 4*i:
+                                    self.cfg.DATA_OFFSET + 4*(i+1)]))[0]
+            data = {
+                'floats': floats,
+            }
         return data
 
     def create_packet(self, cmd_id, data):
@@ -510,15 +536,16 @@ class UARTCommunicator:
             elif data['my_color'] == 'blue':
                 my_color_int = 1
             packet += my_color_int.to_bytes(1, self.endianness)
-        # Parse Self Test data, CMD_ID = 0x00
-        # Temp. same as gimbal
+        # Parse Selfcheck data, CMD_ID = 0x03
         if cmd_id == self.cfg.SELFCHECK_CMD_ID:
-            # "<f" means little endian float
-            packet += struct.pack("<f", data['rel_yaw'])
-            packet += struct.pack("<f", data['rel_pitch'])
-            # 0 for 'ST' 1 for 'MY',
+            # 0 for 'FLUSH' 1 for 'ECHO' 2 for 'ID',
             packet += self.cfg.SELFCHECK_MODE.index(data['mode']).to_bytes(1, self.endianness)
             packet += data['debug_int'].to_bytes(1, self.endianness)
+        # Parse Arm data, CMD_ID = 0x04
+        if cmd_id == self.cfg.ARM_CMD_ID:
+            # "<f" means little endian float
+            for v in data['floats'].values():
+                packet += struct.pack('<f', v)
         # Data length = Total length - 9
         assert len(packet) == self.cfg.CMD_TO_LEN[cmd_id]
         return packet
@@ -550,8 +577,7 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
         packet_status = [False] * rounds
         for i in range(rounds):
             logger.debug(f'Sending packet #{i} to stm32...')
-            data = {'rel_yaw': i, 'rel_pitch': i,
-                    'mode': 'EC', 'debug_int' : i}
+            data = {'mode': 'ECHO', 'debug_int' : i}
 
             send_time[i] = time.time()
             uart.create_and_send_packet(cmd_id, data)
@@ -571,8 +597,8 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
             uart.try_read_one()
             if uart.packet_search():
                 received_data = uart.get_current_stm32_state()
-                i = int(received_data['rel_yaw'])
-                # rel_yaw and rel_pitch act as (the same) index,
+                i = int(received_data['debug_int'])
+                # debug_int acts as the index
                 receive_time[i] = time.time()
                 logger.debug(f'Received packet #{i} from stm32...')
                 received += 1
@@ -640,53 +666,40 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
 # then the first packet will be parsed.
 # If a data type is 10 bytes long then sending a third packet is necessary
 # before pingpong
-def test_board_pingpong():
-    i = 0
-    cmd_id = uart.cfg.GIMBAL_CMD_ID
-    packet_count = 0
+# Modified by Austin
+def test_board_pingpong(uart, rounds=10, timeout=1, hz=2,
+                        verbose=True):
+    print('Communicator beginning minipc <-> board pingpong test: '
+          f'{rounds} rounds at {hz} Hertz')
+    def receive_packet(timeout):
+        current_time = time.time()
+        while time.time() - current_time < timeout:
+            uart.try_read_one()
+            if uart.packet_search():
+                return uart.get_current_stm32_state()
+            time.sleep(0.001) # Use same frequency as listen_.
+        return None
 
-    # sending packet the first time
-    data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-    print("Sending the first time: ID = " +
-          str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
-    uart.create_and_send_packet(cmd_id, data)
+    def send_recv_packets(rounds, timeout, hz):
+        sent, received = 0, 0
+        cmd_id = uart.cfg.SELFCHECK_CMD_ID
+        for i in range(rounds):
+            print(f'Sending packet #{i} to stm32...')
+            data = {'mode': 'ECHO', 'debug_int' : i}
 
-    # attempt to receive packet
-    print('attemp to receive and parse response...')
-    for i in range(20):
-        time.sleep(0.1)
-        if uart.try_read_one():
-            print("data waiting at serial port")
-            print("circular buffer:" + str(uart.circular_buffer))
-        if uart.packet_search():
-            received_data = uart.get_current_stm32_state()
-            print("from stm32: rel_yaw = " +
-                  str(received_data['rel_yaw']) +
-                  " rel_pitch = " +
-                  str(received_data['rel_pitch']))
+            uart.create_and_send_packet(cmd_id, data)
+            sent += 1
+            received_data = receive_packet(timeout)
+            if received_data is not None:
+                received += 1
+                print(received_data)
+            else:
+                print(f'Lost packet ${i}.')
 
-    # sending packet the second time
-    packet_count += 1
-    data = {'rel_yaw': packet_count, 'rel_pitch': 0.0, 'mode': 'ST', 'debug_int': 42}
-    print("Sending the second time: ID = " +
-          str(data['rel_yaw']) + " count = " + str(data['rel_pitch']))
-    uart.create_and_send_packet(cmd_id, data)
+            time.sleep(1/hz)
+        return (sent, received)
 
-    print('starting ping pong')
-    # start ping pong
-    while True:
-        uart.try_read_one()
-        # update stm32 status from packet from stm32
-        if uart.packet_search():
-            received_data = uart.get_current_stm32_state()
-            print("from stm32: rel_yaw = " +
-                  str(received_data['rel_yaw']) +
-                  " rel_pitch = " +
-                  str(received_data['rel_pitch']))
-            received_data['rel_pitch'] = received_data['rel_pitch'] + 1
-            uart.create_and_send_packet(cmd_id, received_data)
-
-        time.sleep(0.05)
+    sent, received = send_recv_packets(rounds, timeout, hz)
 
 # rate test by Roger modified by Richard, flash example/minipc/StressTestTypeC.cc
 # Modified by Austin.
@@ -705,8 +718,7 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
         packet_status = [False] * rounds
         for i in range(rounds):
             logger.debug(f'Sending packet #{i} to stm32...')
-            data = {'rel_yaw': i, 'rel_pitch': i,
-                    'mode': 'EC', 'debug_int' : 0}
+            data = {'mode': 'ECHO', 'debug_int' : 0}
 
             uart.create_and_send_packet(cmd_id, data)
             packet_status[i] = True
@@ -724,9 +736,8 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
             uart.try_read_one()
             if uart.packet_search():
                 received_data = uart.get_current_stm32_state()
-                i = int(received_data['rel_yaw'])
-                # rel_yaw and rel_pitch act as (the same) index,
-                # debug_int now contains cmd_id
+                # debug_int acts as the index
+                i = int(received_data['debug_int'])
                 packet_status[i] = True
                 logger.debug(f'Received packet #{i} from stm32...')
                 received += 1
@@ -765,23 +776,26 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
     return {'loss' : (loss, loss/rounds),
             'detailed' : statuses}
 
-def test_board_typea():
+def test_board_typea(uart, rounds=5, interval=1,
+                     verbose=True):
+    print('Communicator beginning minipc <-> board Type A test: '
+          f'{rounds} rounds at {interval} intervals')
     # vanilla send test, flash typeA.cc
     cur_packet_cnt = uart.parsed_packet_cnt
-    cur_time = time.time()
     prv_parsed_packet_cnt = 0
-    while True:
-        uart.try_read_one()
-        uart.packet_search()
-        if uart.parsed_packet_cnt > cur_packet_cnt:
-            cur_packet_cnt = uart.parsed_packet_cnt
-            # print(uart.get_current_stm32_state())
-        time.sleep(0.001)
-        if time.time() > cur_time + 1:
-            print("Parsed {} packets in 1 second.".format(
-                cur_packet_cnt - prv_parsed_packet_cnt))
-            prv_parsed_packet_cnt = cur_packet_cnt
-            cur_time = time.time()
+    for i in range(rounds):
+        cur_time = time.time()
+        while time.time() - cur_time < interval:
+            uart.try_read_one()
+            uart.packet_search()
+            if uart.parsed_packet_cnt > cur_packet_cnt:
+                cur_packet_cnt = uart.parsed_packet_cnt
+                #print(uart.get_current_stm32_state())
+            time.sleep(0.001)
+        print("Parsed {} packets in 1 second.".format(
+            cur_packet_cnt - prv_parsed_packet_cnt))
+        prv_parsed_packet_cnt = cur_packet_cnt
+        cur_time = time.time()
 
 if __name__ == '__main__':
     # Unit testing
