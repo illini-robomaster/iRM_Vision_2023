@@ -1,11 +1,34 @@
 from threading import Lock
 # (fake) atomic list
-# XXX: Only .copy() returns another AtomicList
+# XXX: All methods return a normal list
 class AtomicList:
     def __init__(self, *args):
         self._lst = [*args]
         self._lck = Lock()
 
+    def take_one(self):
+        with self._lck:
+            if self._lst:
+                head, *tail = self._lst
+                self._lst = tail
+                return head
+            else:
+                return None
+
+    def take_n(self):
+        with self._lck:
+            heads = self._lst[:n]
+            tail = self._lst[n:]
+            self._lst = tail
+            return heads
+
+    def filter_in_place(self, func):
+        with self._lck:
+            self._lst = AtomicList(*filter(func, self._lst))
+
+    #
+    # List methods
+    #
     def append(self, value):
         with self._lck:
             return self._lst.append(value)
@@ -16,7 +39,7 @@ class AtomicList:
 
     def copy(self):
         with self._lck:
-            return AtomicList(self._lst.copy())
+            return self._lst.copy()
 
     def count(self, value):
         with self._lck:
@@ -69,6 +92,7 @@ class AtomicList:
     def __iadd__(self, other):
         with self._lck:
             self._lst += other
+            return self
 
     def __mul__(self, other):
         with self._lck:
@@ -77,6 +101,7 @@ class AtomicList:
     def __imul__(self, other):
         with self._lck:
             self._lst *= other
+            return self
 
     def __eq__(self, other):
         with self._lck:
@@ -135,3 +160,7 @@ if __name__ == '__main__':
     ll = iter(l)
     print(ll)
     print(type(ll))
+    l.filter_in_place(lambda n: n>90)
+    print(l)
+    lll = set(l)
+    print(type(lll), lll)
