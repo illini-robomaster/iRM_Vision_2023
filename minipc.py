@@ -116,8 +116,6 @@ def is_uart(dev_type: DeviceType) -> bool:
 def is_usb(dev_type: DeviceType) -> bool:
     return dev_type <= USB
 
-# Remove an entry from `in_use'
-
 
 def delist_device(device: Communicator) -> None:
     dev_path = device.get_port()
@@ -297,12 +295,12 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
     id_uart_thread.start()
     id_usb_thread.start()
 
+#
 # Starts listening for new devices and updates `unified_state'. The
 # frequency parameter only controls the rate of scanning `listen_queue' and
 # fetching the state from `serial_devices' and not the frequency of the
 # Communicator objects (in `serial_devices') themselves.
-
-
+#
 def _listener(hz_pull=4, hz_push=200):
 
     def get_listen_queue() -> AtomicList:
@@ -402,9 +400,9 @@ def _sender(hz=200):
                 pass
         time.sleep(1 / hz)
 
+#
 # Convert octal to binary representation and run tests.
-
-
+#
 def startup_tests(
         testable: List[Tuple[Callable, DeviceType]], verb=0o10) -> None:
     # i.e. 0o16 => reversed('1110') will run test_board_{latency,pingpong,crc}
@@ -510,5 +508,5 @@ if __name__ == '__main__':
     try:
         main(parsed_args)
     except KeyboardInterrupt:
-        print()
-        pass
+        print('Exiting...')
+        exit(130)

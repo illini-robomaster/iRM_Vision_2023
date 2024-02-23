@@ -1,6 +1,6 @@
 #!/bin/bash
 HELP=$(cat << EOF
-Usage: $(basename "$0") [options] install clean
+Usage: $(basename "$0") [options] install clean reinstall
 
   -t, --tmux-dir        tmux directory
   -s, --systemd-dir     User systemd directory
@@ -14,8 +14,10 @@ may want to add \`alias minipc='tmux -L mtd attach -t mtd'\` to your bashrc. To
 kill the daemon, either stop the attached session manually or run
 \`systemctl --user stop ${SRV}\`.
 
+[Ctrl+c] within the session restarts the minipc script.
+
 Do not remove this file or ${LOG}. If this file is moved, move the log
-with it. Clean and reinstall.
+with it. Clean before reinstalling.
 
 Default key bindings (Meta is likely Alt):
   M-f   -> send-prefix (begin command)
@@ -23,7 +25,13 @@ Default key bindings (Meta is likely Alt):
   z     -> kill-window
   d     -> detach
   r     -> source-file /path/to/${CNF}
-I.e. to detach the connected session, press [Alt+f] then press [d].
+
+Examples:
+  To detach the connected session, press [Alt+f] then press [d].
+  To kill the connected session, press [Alt+f] then press [z].
+
+For some terminals, the meta key has to be configured to act as an escape key.
+E.g. set 'XTerm*metaSendsEscape: true' for \`xterm\`
 EOF
 )
 LOG=.mtdparam.log
@@ -34,7 +42,7 @@ CONF_DIR=${XDG_CONFIG_HOME:-$HOME/.config}
 TMUX_DIR=${CONF_DIR}/tmux
 SYSTEMD_DIR=${CONF_DIR}/systemd/user
 MINIPC_DIR=$PWD
-MINIPC_VENV=bin/activate
+MINIPC_VENV=venv/bin/activate
 MINIPC_TARGET=minipc.py
 UMASK_MODE=0022
 user_tmux_dir=
@@ -49,21 +57,19 @@ script_file=$(realpath "$0")
 script_dir=$(realpath "${script_file}" | xargs dirname)
 script_log=${script_dir}/${LOG}
 
-interactive=
-
 function printhelp() {
     echo "$HELP"
     exit ${1:-0}
 }
 
 function install() {
-    interactive=$1
+    interactive=${1/-}
     if [ -f "${script_log}" ]; then
         echo "${script_log}" already exists.
         echo Run \`${script_name} clean\` before reinstalling.
         exit 1
     fi
-    if [ "$interactive" ]; then
+    if [ ${interactive} ]; then
         echo Choose \`tmux\` configuration directory.
         echo -n [default=${TMUX_DIR}]:\ 
         read user_tmux_dir
@@ -107,7 +113,7 @@ function install() {
     echo "LOG:           ${script_log}"
     echo
 
-    if [ "$interactive" ]; then
+    if [ ${interactive} ]; then
         echo -n Continue? [,y/n]\ 
         read cont
         [ "$cont" ] && exit 0
@@ -161,6 +167,7 @@ Description=minipctd
 Type=forking
 ExecStart=/bin/tmux -f "${f_tmuxconf}" -L mtd new-ses -s mtd -n minipctd -c "${user_minipc_dir}" -d -- "${script_file}" jobcontrol "${user_minipc_venv}" "${user_minipc_target}" --skip-tests --verbosity INFO
 ExecStop=/usr/bin/tmux -L mtd kill-ses
+ExecReload=/usr/bin/tmux -L mtd send-keys C-c
 
 [Install]
 WantedBy=multi-user.target
@@ -182,10 +189,11 @@ EOF
     echo
 
     echo Created files:
-    sed -e '/^[^f]/d' -e "s|^f_.*=\(.*\)|${tmpdir}/\1|" "${tf_mtdparamlog}"
+    sed -e '/^[^f]/d' -e "s|^f_.*=\(.*\)|${tmpdir}/\1|" "${tf_mtdparamlog}" \
+        | xargs ls -ld
     echo
 
-    if [ "${interactive}" ]; then
+    if [ ${interactive} ]; then
         echo -n Copy to system? [,y/n]\ 
         read cont
         [ "$cont" ] && exit 0
@@ -193,8 +201,6 @@ EOF
     fi
 
     echo Copy to system \(umask ${user_umask_mode}\)
-    echo
-
     function copy_to_system() (
         tmpdir=$1
         script_file=$2
@@ -214,16 +220,16 @@ EOF
             cat "${tmpdir}/${!f}" > "${!f}"
         done
     )
-
     copy_to_system "${tmpdir}" \
                    "${script_file}" \
                    "${script_dir}" \
                    "${script_log}" \
                    "${user_umask_mode}"
+    cat "${script_log}" | cut -d= -f2 | xargs ls -l
     echo
 
 
-    echo Run \`systemd --user daemon-reload\`
+    echo Reload systemd configuration with \`systemctl --user daemon-reload\`
     systemctl --user daemon-reload
 
     echo
@@ -232,13 +238,16 @@ EOF
 
 
 function clean() {
-    interactive=$1
+    interactive=${1/-}
+    reinstall=${2/-}
     if [ ! -f "${script_log}" ]; then
         echo "${script_log}" does not exist.
         echo Nothing to be cleaned.
-        exit 0
+        [ "${reinstall}" ] \
+            && return 0 \
+            || exit 0
     fi
-    if [ "$interactive" ]; then
+    if [ ${interactive} ]; then
         cat "${script_log}"
         echo
         echo -n Remove these? [,y/n]\ 
@@ -267,10 +276,20 @@ function jobcontrol() {
     job_target=$2
     shift 2
     source "${job_venv}" && \
-        /usr/bin/env python3 "${job_target}" "$@"
-    exit $?
+        /usr/bin/env python3 -O "${job_target}" "$@"
+    returncode=$?
+    # Restart if killed with C-c
+    if [ ${returncode} -eq 130 ]; then
+        deactivate
+        clear
+        jobcontrol "${job_venv}" "${job_target}" "$@"
+    else
+        exit ${returncode}
+    fi
 }
 
+interactive=-
+reinstall=-
 function run() {
     while [ $# -gt 0 ]; do
         case $1 in
@@ -293,10 +312,15 @@ function run() {
                 interactive=1;
                 shift;;
             install)
-                install $interactive;
+                install ${interactive};
                 shift;;
             clean)
-                clean $interactive;
+                clean ${interactive};
+                shift;;
+            reinstall)
+                reinstall=1
+                clean ${interactive} ${reinstall};
+                install ${interactive};
                 shift;;
             jobcontrol)
                 shift;
