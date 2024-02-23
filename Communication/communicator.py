@@ -11,6 +11,7 @@ import time
 import threading
 import struct
 from copy import deepcopy
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class MiniPCCommunicationError(Exception):
 
 
 class StateDict:
+
     def __init__(self, **kwargs):
         self.dict = dict(kwargs)
         self.lock = threading.Lock()
@@ -48,7 +50,39 @@ class StateDict:
                 del self.dict[k]
 
 
-class UARTCommunicator:
+class Communicator:
+
+    def __init__(self):
+        pass
+
+    def start_listening(self) -> None:
+        pass
+
+    def is_valid(self) -> bool:
+        pass
+
+    def is_vacuum(self) -> bool:
+        pass
+
+    def is_alive(self) -> bool:
+        pass
+
+    def get_port(self) -> Optional[str]:
+        pass
+
+    def create_and_send_packet(self, cmd_id, data) -> None:
+        pass
+
+    def create_packet(self, cmd_id, data) -> Union[bytes, dict]:
+        pass
+
+    def send_packet(self, packet) -> None:
+        pass
+
+    def read_out(self) -> dict:
+        pass
+
+class UARTCommunicator(Communicator):
     """USB-TTL-UART communicator for Jetson-STM32 communication."""
 
     def __init__(
@@ -157,6 +191,10 @@ class UARTCommunicator:
     def is_alive(self):
         self.serial_port.inWaiting()
         return True
+
+    def get_port(self):
+        if not self.is_vacuum():
+            return self.serial_port.port
 
     def try_read_one(self):
         """Try to copy from serial port to a circular buffer.
@@ -572,8 +610,37 @@ class UARTCommunicator:
 
 
 class USBCommunicator:
+
     def __init__(self):
         pass
+
+    def start_listening(self) -> None:
+        pass
+
+    def is_valid(self) -> bool:
+        pass
+
+    def is_vacuum(self) -> bool:
+        pass
+
+    def is_alive(self) -> bool:
+        pass
+
+    def get_port(self) -> Optional[str]:
+        pass
+
+    def create_and_send_packet(self, cmd_id, data) -> None:
+        pass
+
+    def create_packet(self, cmd_id, data) -> Union[bytes, dict]:
+        pass
+
+    def send_packet(self, packet) -> None:
+        pass
+
+    def read_out(self) -> dict:
+        pass
+
 
 
 # XXX: Move tests out, leave simpler unit tests? i.e. only pingpong

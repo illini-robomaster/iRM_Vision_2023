@@ -20,7 +20,8 @@ from Utils.ansi import *
 from Utils.matchall import MatchAll
 from Utils.atomiclist import AtomicList
 from Communication import communicator
-from Communication.communicator import UARTCommunicator, USBCommunicator, \
+from Communication.communicator import Communicator, \
+                                       UARTCommunicator, USBCommunicator, \
                                        StateDict
 
 _m = MatchAll()
@@ -48,6 +49,9 @@ ap.add_argument('--test-only',
 ap.add_argument('-V', '--version',
                 action='version',
                 version='%(prog)s 0.1')
+ap.add_argument('--dummy',
+                action='store_true',
+                help=argparse.SUPPRESS)
 
 # Add loggers here
 loggers = [logger := logging.getLogger(__name__),
@@ -71,7 +75,7 @@ ARM = DeviceType.ARM
 
 # This is expected to be thread-safe.
 # Muting data in an (Int)Enum is not expected behavior, so:
-serial_devices: Dict[DeviceType, 'Communicator'] = {
+serial_devices: Dict[DeviceType, Communicator] = {
     UART: UARTCommunicator(config, serial_dev_path=False, warn=False),
     USB: UARTCommunicator(config, serial_dev_path=False, warn=False),  # XXX: Replace when USBCommunicator is ready
     BRD: None,
@@ -87,23 +91,17 @@ intenum_to_name = {
     ARM: 'ARM',
 }
 
-global in_use
 in_use: List['path'] = AtomicList()
-
 # XXX: Change names or reimplement? Only send_queue actually acts as a queue.
-global id_queue
-global send_queue
-global listen_queue
-global unified_state
 id_queue: List[DeviceType] = AtomicList()
 send_queue: List[Tuple[DeviceType, bytes]] = AtomicList()
-listen_queue: List[Tuple[DeviceType, 'Communicator']] = AtomicList()
+listen_queue: List[Tuple[DeviceType, Communicator]] = AtomicList()
 unified_state = StateDict()
 
 def dname(intenum: DeviceType) -> str:
     return intenum_to_name[intenum]
 
-def get_device(dev_type: DeviceType) -> 'Communicator':
+def get_device(dev_type: DeviceType) -> Communicator:
     return serial_devices[dev_type]
 
 def is_uart(dev_type: DeviceType) -> bool:
@@ -113,14 +111,14 @@ def is_usb(dev_type: DeviceType) -> bool:
     return dev_type <= USB
 
 # Remove an entry from `in_use'
-def delist_device(device: 'Communicator') -> None:
-    dev_path = not device.is_vacuum() and device.serial_port.port
+def delist_device(device: Communicator) -> None:
+    dev_path = device.get_port()
     if dev_path:
         logger.debug(f'Freeing {dev_path}.')
         in_use.remove(dev_path)
 
 def get_communicator(
-        dev_type: DeviceType, *args, **kwargs) -> 'Communicator':
+        dev_type: DeviceType, *args, **kwargs) -> Communicator:
     if is_uart(dev_type):
         return UARTCommunicator(in_use=in_use, *args, **kwargs)
     elif is_usb(dev_type):
@@ -145,20 +143,20 @@ def set_up_loggers(
 # use only.
 # 
 def _create_packet_dev(
-        device: 'Communicator', cmd_id: hex, data: dict) -> bytes:
+        device: Communicator, cmd_id: hex, data: dict) -> bytes:
     return device.create_packet(cmd_id, data)
 
-def _send_packet_dev(device: 'Communicator', packet: bytes) -> None:
+def _send_packet_dev(device: Communicator, packet: bytes) -> None:
     return device.send_packet(packet)
 
 def _create_and_send_packet_dev(
-        device: 'Communicator', cmd_id: hex, data: dict) -> None:
+        device: Communicator, cmd_id: hex, data: dict) -> None:
     return device.create_and_send_packet(cmd_id, data)
 
-def _read_packet_dev(device: 'Communicator') -> dict:
+def _read_packet_dev(device: Communicator) -> dict:
     return device.read_out()
 
-def _receive_packet_dev(device: 'Communicator') -> None:
+def _receive_uart_packet_dev(device: Communicator) -> None:
     device.try_read_one()
     device.packet_search()
 
@@ -184,6 +182,11 @@ def push_to_send_queue(dev_type: DeviceType, packet: bytes) -> None:
     global send_queue
     send_queue += [(dev_type, packet)]
 
+def create_and_push(
+        dev_type: DeviceType, cmd_id: hex, data: dict) -> None:
+    global send_queue
+    send_queue += [(dev_type, create_packet(cmd_id, data))]
+
 
 def _identifier(hz_uart=2, hz_usb=2) -> None:
 
@@ -197,7 +200,7 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
             id_queue.remove(dev_type)
 
     def push_to_listen_queue(
-            dev_type: DeviceType, device: 'Communicator') -> None:
+            dev_type: DeviceType, device: Communicator) -> None:
         global listen_queue
         listen_queue += [(dev_type, device)]
 
@@ -211,7 +214,7 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
         data = {'mode': 'ID', 'debug_int': 3}
         packet = create_packet(UART, cmd_id, data)
         while True:
-            known_paths = {dev.serial_port.port
+            known_paths = {dev.get_port()
                            for dev in serial_devices.values()
                            if dev is not None
                            if not dev.is_vacuum()}
@@ -244,22 +247,22 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
             for dev in serial_experiments.copy():
                 try:
                     _send_packet_dev(dev, packet)
-                    _receive_packet_dev(dev)
+                    _receive_uart_packet_dev(dev)
                     received_packet = _read_packet_dev(dev)
                     dev_type = received_packet['debug_int'] - 127
                     if dev_type in id_queue:
                         # Success.
+                        serial_experiments.remove(dev)
                         logger.info(f'Identified {dname(dev_type)}, '
                                     f'pushing {dev} to listen queue.')
-                        serial_experiments.remove(dev)
+                        push_to_listen_queue(dev_type, dev)
                         logger.info(f'Freeing {dname(dev_type)} '
                                     'from identification queue.')
-                        push_to_listen_queue(dev_type, dev)
                         free_from_id_queue(dev_type)
-                except (OSError, serial.serialutil.SerialException):
+                except:
+                    serial_experiments.remove(dev)
                     logger.info(
                             f'Removed {dev} as identification candidate')
-                    serial_experiments.remove(dev)
                     delist_device(dev)
             time.sleep(1/hz)
 
@@ -293,14 +296,13 @@ def _listener(hz_pull=4, hz_push=200):
         global id_queue
         id_queue += [dev_type]
 
-    def assign_device(dev_type: DeviceType, device: 'Communicator') -> None:
+    def assign_device(dev_type: DeviceType, device: Communicator) -> None:
         serial_devices[dev_type] = device
 
     def deassign_device(dev_type: DeviceType) -> None:
         device = get_device(dev_type)
         assign_device(dev_type, None)
         delist_device(device)
-        push_to_id_queue(dev_type)
 
     def _queue_puller(hz):
         while True:
@@ -338,9 +340,10 @@ def _listener(hz_pull=4, hz_push=200):
                             logger.error('Lost connection to '
                                          f'{dname(dev_type)}, deassigning '
                                          f'{get_device(dev_type)}.')
+                            deassign_device(dev_type)
                             logger.info(f'Pushing {dname(dev_type)} '
                                         'to identification queue.')
-                            deassign_device(dev_type)
+                            push_to_id_queue(dev_type)
                             print(f'=> {dname(dev_type)}: '
                                   f'{RED}{get_device(dev_type)}{RESET}')
                 else:
@@ -356,9 +359,7 @@ def _listener(hz_pull=4, hz_push=200):
     state_pusher_thread = threading.Thread(target=_state_pusher,
                                            args=(hz_push,))
     queue_puller_thread.start()
-
     state_pusher_thread.start()
-    state_pusher_thread.join()
 
 def _sender(hz=200):
 
@@ -469,9 +470,6 @@ if __name__ == '__main__':
     parsed_args.verbosity: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
                                                       (default WARNING,
                                                        w/o arg INFO)
-    parsed_args.board_port: '/path/to/some/port'      (d. None)
-    parsed_args.spacemouse_port: '/path/to/some/port' (d. None)
-    parsed_args.arm_port: '/path/to/some/port'        (d. None)
     parsed_args.test: 'octal'                         (d. '0o10')
     parsed_args.skip_tests: boolean
     parsed_args.test_only: boolean

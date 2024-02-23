@@ -1,10 +1,6 @@
 #!/bin/bash
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-LOG=.mtdparam.log
-SRV=minipctd.service
-CNF=tmux-mtd.conf
 HELP=$(cat << EOF
-Usage: $(basename $0) [i|interactive] install clean
+Usage: $(basename "$0") [options] install clean
 
   -t, --tmux-dir        tmux directory
   -s, --systemd-dir     User systemd directory
@@ -30,8 +26,13 @@ Default key bindings (Meta is likely Alt):
 I.e. to detach the connected session, press [Alt+f] then press [d].
 EOF
 )
-TMUX_DIR=${XDG_CONFIG_HOME}/tmux
-SYSTEMD_DIR=${XDG_CONFIG_HOME}/systemd/user
+LOG=.mtdparam.log
+SRV=minipctd.service
+CNF=tmux-mtd.conf
+
+CONF_DIR=${XDG_CONFIG_HOME:-$HOME/.config}
+TMUX_DIR=${CONF_DIR}/tmux
+SYSTEMD_DIR=${CONF_DIR}/systemd/user
 MINIPC_DIR=$PWD
 MINIPC_VENV=bin/activate
 MINIPC_TARGET=minipc.py
@@ -47,6 +48,8 @@ script_name=$(basename "$0")
 script_file=$(realpath "$0")
 script_dir=$(realpath "${script_file}" | xargs dirname)
 script_log=${script_dir}/${LOG}
+
+interactive=
 
 function printhelp() {
     echo "$HELP"
@@ -156,11 +159,11 @@ Description=minipctd
 
 [Service]
 Type=forking
-ExecStart=/bin/tmux -f "${f_tmuxconf}" -L mtd new-ses -s mtd -n minipctd -c "${user_minipc_dir}" -d -- "$0" jobcontrol "${user_minipc_venv}" "${user_minipc_target}" --skip-tests --verbosity INFO
-ExecStop=/usr/bin/tmux -L mtd send-keys -t mtd:minipctd.0 C-c
+ExecStart=/bin/tmux -f "${f_tmuxconf}" -L mtd new-ses -s mtd -n minipctd -c "${user_minipc_dir}" -d -- "${script_file}" jobcontrol "${user_minipc_venv}" "${user_minipc_target}" --skip-tests --verbosity INFO
+ExecStop=/usr/bin/tmux -L mtd kill-ses
 
 [Install]
-WantedBy=multi-use.target
+WantedBy=multi-user.target
 EOF
     echo
     echo
@@ -247,7 +250,8 @@ function clean() {
     source "${script_log}"
     # Files
     for f in ${!f_@}; do
-        rm -fv "${!f}"
+        [ -f "${!f}" ] && \
+            rm -v "${!f}"
     done
     # Directories
     for d in ${!d_@}; do
@@ -261,15 +265,13 @@ function clean() {
 function jobcontrol() {
     job_venv=$1
     job_target=$2
-    shift; shift
-    job_args=$@
+    shift 2
     source "${job_venv}" && \
-        /usr/bin/env python3 "${job_target}" $job_args
-    exit 0
+        /usr/bin/env python3 "${job_target}" "$@"
+    exit $?
 }
 
 function run() {
-    interactive=
     while [ $# -gt 0 ]; do
         case $1 in
             -t|--tmux-dir)
