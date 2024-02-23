@@ -5,7 +5,7 @@ DARKGRAY = DARKGREY = '\033[90m'
 
 DARKRED = '\033[31m'
 RED = '\033[91m'
- 
+
 DARKGREEN = '\033[32m'
 GREEN = '\033[92m'
 
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     print(LIGHTGRAY + f'{LIGHTGRAY=}' + RESET, end='\t')
     print(LIGHTGREY + f'{LIGHTGREY=}' + RESET, end='\t')
     print(WHITE + f'{WHITE=}' + RESET)
-    
+
     print(UNDERLINE + f'{UNDERLINE=}' + NOUNDERLINE + '\t' + f'{NOUNDERLINE=}')
     print(BOLD + f'{BOLD=}' + NOBOLD + '\t\t' + f'{NOBOLD=}')
 

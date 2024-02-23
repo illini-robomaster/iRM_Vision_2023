@@ -3,6 +3,7 @@ import logging
 
 from .ansi import *
 
+
 class ColorFormatter(logging.Formatter):
     format0 = "%(asctime)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
     format1 = "%(levelname)s - %(message)s (%(filename)s:%(lineno)d)"

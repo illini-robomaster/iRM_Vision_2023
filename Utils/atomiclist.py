@@ -1,6 +1,8 @@
 from threading import Lock
 # (fake) atomic list
 # XXX: All methods return a normal list
+
+
 class AtomicList:
     def __init__(self, *args):
         self._lst = [*args]
@@ -155,12 +157,13 @@ class AtomicList:
         with self._lck:
             return self._lst.__sizeof__()
 
+
 if __name__ == '__main__':
-    l = AtomicList(99, 98, 97, 1, 2, 3)
-    ll = iter(l)
+    al = AtomicList(99, 98, 97, 1, 2, 3)
+    ll = iter(al)
     print(ll)
     print(type(ll))
-    l.filter_in_place(lambda n: n>90)
-    print(l)
-    lll = set(l)
+    al.filter_in_place(lambda n: n > 90)
+    print(al)
+    lll = set(al)
     print(type(lll), lll)

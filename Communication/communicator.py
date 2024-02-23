@@ -82,6 +82,7 @@ class Communicator:
     def read_out(self) -> dict:
         pass
 
+
 class UARTCommunicator(Communicator):
     """USB-TTL-UART communicator for Jetson-STM32 communication."""
 
@@ -117,7 +118,6 @@ class UARTCommunicator(Communicator):
                 logger.warning('Did not receive a list of ports in use, assuming none.')
             in_use = []
 
-        
         if serial_dev_path is None:
             if serial_dev is None:
                 self.use_uart_device(self.guess_uart_device(in_use), in_use)
@@ -204,7 +204,7 @@ class UARTCommunicator(Communicator):
         """
         try:
             self.is_alive()
-        except:
+        except BaseException:
             return False
         # Read from serial port, if any packet is waiting
         if self.serial_port is not None:
@@ -498,8 +498,8 @@ class UARTCommunicator(Communicator):
             }
             for i, k in enumerate(floats.keys()):
                 floats[k] = struct.unpack('<f', bytes(
-                    possible_packet[self.cfg.DATA_OFFSET + 4*i:
-                                    self.cfg.DATA_OFFSET + 4*(i+1)]))[0]
+                    possible_packet[self.cfg.DATA_OFFSET + 4 * i:
+                                    self.cfg.DATA_OFFSET + 4 * (i + 1)]))[0]
             data = {
                 'floats': floats,
             }
@@ -609,7 +609,7 @@ class UARTCommunicator(Communicator):
         return self.get_current_stm32_state()
 
 
-class USBCommunicator:
+class USBCommunicator(Communicator):
 
     def __init__(self):
         pass
@@ -642,28 +642,28 @@ class USBCommunicator:
         pass
 
 
-
 # XXX: Move tests out, leave simpler unit tests? i.e. only pingpong
 # Latency test by Richard, flash example/minipc/LatencyTest.cc
 # Modified by Austin.
 # Tests Minipc <-> Type C board circuit time
 def test_board_latency(uart, rounds=15, timeout=1, hz=200,
-                 listening=True, verbose=True):
+                       listening=True, verbose=True):
     print('\nCommunicator beginning minipc <-> board latency test: '
           f'{rounds} rounds at {hz} Hertz')
     cmd_id = uart.cfg.SELFCHECK_CMD_ID
+
     def send_packets(rounds, hz):
         send_time = [0] * rounds
         packet_status = [False] * rounds
         for i in range(rounds):
             logger.debug(f'Sending packet #{i} to stm32...')
-            data = {'mode': 'ECHO', 'debug_int' : i}
+            data = {'mode': 'ECHO', 'debug_int': i}
 
             send_time[i] = time.time()
             uart.create_and_send_packet(cmd_id, data)
             packet_status[i] = True
 
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
         return (send_time, packet_status)
 
@@ -689,13 +689,13 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
                     logger.debug(f'Received packet #{i} from stm32...')
             except IndexError:
                 pass
-            time.sleep(0.001) # Use same frequency as listen_.
+            time.sleep(0.001)  # Use same frequency as listen_.
         for i, t in enumerate(receive_time):
             if t != 0:
                 packet_status[i] = True
 
         ret[0:1] = [receive_time, packet_status]
-        return ret[0:1] # If not run as Thread.
+        return ret[0:1]  # If not run as Thread.
 
     # Start the receive thread first
     rt_return = []
@@ -715,27 +715,27 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
     statuses = [*zip(send_packet_status, receive_packet_status)]
 
     loss = latencies.count(0.0)
-    average_latency = sum(latencies)/(len(latencies)-loss or 1) # Prevent 0/0
+    average_latency = sum(latencies) / (len(latencies) - loss or 1)  # Prevent 0/0
 
     for i in range(rounds):
         is_sent = statuses[i][0]
         is_received = statuses[i][1]
         logger.debug('Status of packet %d: send: %s, receive: %s' %
-               (i, ('UNSENT!', 'sent')[is_sent],
-                   ('NOT RECEIVED!', 'received')[is_received]))
+                     (i, ('UNSENT!', 'sent')[is_sent],
+                      ('NOT RECEIVED!', 'received')[is_received]))
         logger.debug(f'Latency of packet #{i}: {latencies[i]}')
 
     print('Attempted to send', rounds, 'packets.',
-           send_packet_status.count(True), 'Packets transmitted,',
-           rounds-loss, 'packets received.')
+          send_packet_status.count(True), 'Packets transmitted,',
+          rounds - loss, 'packets received.')
     print(f'Packets lost: {loss}/{loss/rounds*100}%. '
           f'Average latency: {average_latency}')
     if not_all_received:
         logger.warning('Latency test: not all packets were received.')
 
-    return {'average' : average_latency,
-            'loss' : (loss, loss/rounds),
-            'detailed' : [*zip(statuses, latencies)]}
+    return {'average': average_latency,
+            'loss': (loss, loss / rounds),
+            'detailed': [*zip(statuses, latencies)]}
 
 # RX/TX test by YHY modified by Richard, flash example/minipc/PingPongTest.cc
 # this ping pong test first trys to send a packet
@@ -755,10 +755,13 @@ def test_board_latency(uart, rounds=15, timeout=1, hz=200,
 # If a data type is 10 bytes long then sending a third packet is necessary
 # before pingpong
 # Modified by Austin
+
+
 def test_board_pingpong(uart, rounds=5, timeout=1, hz=2,
                         listening=True, verbose=True):
     print('\nCommunicator beginning minipc <-> board pingpong test: '
           f'{rounds} rounds at {hz} Hertz')
+
     def receive_packet(j, timeout):
         current_time = time.time()
         while time.time() - current_time < timeout:
@@ -771,7 +774,7 @@ def test_board_pingpong(uart, rounds=5, timeout=1, hz=2,
                 i = int(received_data['debug_int'])
                 if i == j:
                     return True
-            time.sleep(0.001) # Use same frequency as listen_.
+            time.sleep(0.001)  # Use same frequency as listen_.
 
         return False
 
@@ -781,21 +784,21 @@ def test_board_pingpong(uart, rounds=5, timeout=1, hz=2,
         flusher = uart.create_packet(cmd_id, {'mode': 'FLUSH', 'debug_int': 0})
         for i in range(rounds):
             print(f'Sending packet #{i} to stm32...')
-            data = {'mode': 'ECHO', 'debug_int': i+1}
+            data = {'mode': 'ECHO', 'debug_int': i + 1}
             uart.create_and_send_packet(cmd_id, data)
             for _ in range(5):
-                time.sleep(1/200)
+                time.sleep(1 / 200)
                 uart.send_packet(flusher)
             sent += 1
 
-            received_data = receive_packet(i+1, timeout)
+            received_data = receive_packet(i + 1, timeout)
             if received_data:
                 received += 1
                 print(f'Received packet #{i}')
             else:
                 print(f'Lost packet #{i}.')
 
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
         return (sent, received)
 
     sent, received = send_recv_packets(rounds, timeout, hz)
@@ -808,25 +811,28 @@ def test_board_pingpong(uart, rounds=5, timeout=1, hz=2,
 #    its size is not reaching STJ_MAX_PACKET_SIZE
 # NOTE: please reflash or restart program on stm32 every time you want to run this test
 # TODO: Notify the board and use COLOR packets instead?
+
+
 def test_board_crc(uart, rounds=15, timeout=1, hz=200,
-             listening=True, verbose=True):
+                   listening=True, verbose=True):
     print('\nCommunicator beginning minipc <-> board crc stress test: '
           f'{rounds} rounds at {hz} Hertz')
     cmd_id = uart.cfg.SELFCHECK_CMD_ID
+
     def send_packets(rounds, hz):
         packet_status = [False] * rounds
         for i in range(rounds):
             logger.debug(f'Sending packet #{i} to stm32...')
-            data = {'mode': 'ECHO', 'debug_int' : 0}
+            data = {'mode': 'ECHO', 'debug_int': 0}
 
             uart.create_and_send_packet(cmd_id, data)
             packet_status[i] = True
 
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
         return packet_status
 
-    def receive_packets(rounds, timeout, ret): # Async
+    def receive_packets(rounds, timeout, ret):  # Async
         received = 0
         packet_status = [False] * rounds
         # Receive loop
@@ -848,10 +854,10 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
                     received += 1
             except IndexError:
                 pass
-            time.sleep(0.001) # Use same frequency as listen_.
+            time.sleep(0.001)  # Use same frequency as listen_.
 
         ret[0] = packet_status
-        return ret[0] # If not run as Thread.
+        return ret[0]  # If not run as Thread.
 
     # Send packets first
     print('This test should be run without a listening thread. '
@@ -883,8 +889,9 @@ def test_board_crc(uart, rounds=15, timeout=1, hz=200,
     if not_all_received:
         logger.warning('Crc test: not all packets were received.')
 
-    return {'loss' : (loss, loss/rounds),
-            'detailed' : statuses}
+    return {'loss': (loss, loss / rounds),
+            'detailed': statuses}
+
 
 def test_board_typea(uart, rounds=5, interval=1,
                      verbose=True):
@@ -905,6 +912,7 @@ def test_board_typea(uart, rounds=5, interval=1,
             cur_packet_cnt - prv_parsed_packet_cnt))
         prv_parsed_packet_cnt = cur_packet_cnt
         cur_time = time.time()
+
 
 if __name__ == '__main__':
     # Unit testing
@@ -946,4 +954,3 @@ if __name__ == '__main__':
             test_board_typea()
         case _:
             print("Invalid selection")
-

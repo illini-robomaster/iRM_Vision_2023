@@ -9,10 +9,10 @@ import argparse
 import threading
 from enum import IntEnum
 from typing import Optional, Union, \
-                   Sequence, Tuple, List, \
-                   Set, \
-                   Mapping, Dict, \
-                   Callable
+    Sequence, Tuple, List, \
+    Set, \
+    Mapping, Dict, \
+    Callable
 
 import config
 from Utils import color_logging as cl
@@ -21,8 +21,8 @@ from Utils.matchall import MatchAll
 from Utils.atomiclist import AtomicList
 from Communication import communicator
 from Communication.communicator import Communicator, \
-                                       UARTCommunicator, USBCommunicator, \
-                                       StateDict
+    UARTCommunicator, USBCommunicator, \
+    StateDict
 
 _m = MatchAll()
 
@@ -67,6 +67,7 @@ class DeviceType(IntEnum):
     SPM = -1  # spacemouse
     ARM = -2  # small arm
 
+
 UART = DeviceType.UART
 USB = DeviceType.USB
 BRD = DeviceType.BRD
@@ -77,7 +78,8 @@ ARM = DeviceType.ARM
 # Muting data in an (Int)Enum is not expected behavior, so:
 serial_devices: Dict[DeviceType, Communicator] = {
     UART: UARTCommunicator(config, serial_dev_path=False, warn=False),
-    USB: UARTCommunicator(config, serial_dev_path=False, warn=False),  # XXX: Replace when USBCommunicator is ready
+    # XXX: Replace when USBCommunicator is ready
+    USB: UARTCommunicator(config, serial_dev_path=False, warn=False),
     BRD: None,
     SPM: None,
     ARM: None,
@@ -98,24 +100,31 @@ send_queue: List[Tuple[DeviceType, bytes]] = AtomicList()
 listen_queue: List[Tuple[DeviceType, Communicator]] = AtomicList()
 unified_state = StateDict()
 
+
 def dname(intenum: DeviceType) -> str:
     return intenum_to_name[intenum]
+
 
 def get_device(dev_type: DeviceType) -> Communicator:
     return serial_devices[dev_type]
 
+
 def is_uart(dev_type: DeviceType) -> bool:
     return dev_type >= UART
+
 
 def is_usb(dev_type: DeviceType) -> bool:
     return dev_type <= USB
 
 # Remove an entry from `in_use'
+
+
 def delist_device(device: Communicator) -> None:
     dev_path = device.get_port()
     if dev_path:
         logger.debug(f'Freeing {dev_path}.')
         in_use.remove(dev_path)
+
 
 def get_communicator(
         dev_type: DeviceType, *args, **kwargs) -> Communicator:
@@ -141,46 +150,56 @@ def set_up_loggers(
 # Only use `create_packet` and `push_to_send_queue` outside of the three
 # threads (_identifier, _listener, _sender), everything else is for internal
 # use only.
-# 
+#
 def _create_packet_dev(
         device: Communicator, cmd_id: hex, data: dict) -> bytes:
     return device.create_packet(cmd_id, data)
 
+
 def _send_packet_dev(device: Communicator, packet: bytes) -> None:
     return device.send_packet(packet)
+
 
 def _create_and_send_packet_dev(
         device: Communicator, cmd_id: hex, data: dict) -> None:
     return device.create_and_send_packet(cmd_id, data)
 
+
 def _read_packet_dev(device: Communicator) -> dict:
     return device.read_out()
+
 
 def _receive_uart_packet_dev(device: Communicator) -> None:
     device.try_read_one()
     device.packet_search()
 
+
 def _send_packet(dev_type: DeviceType, packet: bytes) -> None:
     device = get_device(dev_type)
     return _send_packet_dev(device, packet)
+
 
 def _create_and_send_packet(
         dev_type: DeviceType, cmd_id: hex, data: dict) -> None:
     device = get_device(dev_type)
     return _create_and_send_packet_dev(device, cmd_id, data)
 
+
 def _read_packet(dev_type: DeviceType) -> dict:
     device = get_device(dev_type)
     return _read_packet_dev(device)
+
 
 def create_packet(
         dev_type: DeviceType, cmd_id: hex, data: dict) -> bytes:
     device = get_device(dev_type)
     return _create_packet_dev(device, cmd_id, data)
 
+
 def push_to_send_queue(dev_type: DeviceType, packet: bytes) -> None:
     global send_queue
     send_queue += [(dev_type, packet)]
+
 
 def create_and_push(
         dev_type: DeviceType, cmd_id: hex, data: dict) -> None:
@@ -208,8 +227,8 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
         serial_experiments = []
         paths, prev_paths = [set()] * 2
 
-        #cmd_id = config.SELFCHECK_CMD_ID
-        #data = {'mode': 'ID', 'debug_int': 0}
+        # cmd_id = config.SELFCHECK_CMD_ID
+        # data = {'mode': 'ID', 'debug_int': 0}
         cmd_id = config.SELFCHECK_CMD_ID
         data = {'mode': 'ID', 'debug_int': 3}
         packet = create_packet(UART, cmd_id, data)
@@ -224,7 +243,7 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
                     delist_device(dev)
                 serial_experiments = []
                 paths, prev_paths = [set()] * 2
-                time.sleep(1/hz)
+                time.sleep(1 / hz)
                 continue
             # Look for devices.
             # `list_uart_device_paths` returns a list or [None]
@@ -233,13 +252,13 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
                 for pth in paths - prev_paths:
                     try:
                         serial_experiments += [get_communicator(
-                                UART, config, serial_dev_path=pth)]
+                            UART, config, serial_dev_path=pth)]
                         logger.info(
-                                f'Added {serial_experiments[-1]} '
-                                'as identification candidate')
+                            f'Added {serial_experiments[-1]} '
+                            'as identification candidate')
                     # Do not skip on error.
                     # Prevent `pth' from going into `prev_paths'.
-                    except:
+                    except BaseException:
                         paths -= {pth}
                 prev_paths = paths
 
@@ -259,17 +278,17 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
                         logger.info(f'Freeing {dname(dev_type)} '
                                     'from identification queue.')
                         free_from_id_queue(dev_type)
-                except:
+                except BaseException:
                     serial_experiments.remove(dev)
                     logger.info(
-                            f'Removed {dev} as identification candidate')
+                        f'Removed {dev} as identification candidate')
                     delist_device(dev)
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
     # XXX: Add when ready
     def _id_usb(hz):
         while True:
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
     id_uart_thread = threading.Thread(target=_id_uart,
                                       args=(hz_uart,))
@@ -282,6 +301,8 @@ def _identifier(hz_uart=2, hz_usb=2) -> None:
 # frequency parameter only controls the rate of scanning `listen_queue' and
 # fetching the state from `serial_devices' and not the frequency of the
 # Communicator objects (in `serial_devices') themselves.
+
+
 def _listener(hz_pull=4, hz_push=200):
 
     def get_listen_queue() -> AtomicList:
@@ -290,7 +311,7 @@ def _listener(hz_pull=4, hz_push=200):
 
     def free_from_listen_queue(dev_type: DeviceType) -> None:
         global listen_queue
-        listen_queue.filter_in_place(lambda el: el[0]!=dev_type)
+        listen_queue.filter_in_place(lambda el: el[0] != dev_type)
 
     def push_to_id_queue(dev_type: DeviceType) -> None:
         global id_queue
@@ -316,7 +337,7 @@ def _listener(hz_pull=4, hz_push=200):
                                 f'{dev}.')
                     print(f'=> {dname(dev_type)}: '
                           f'{GREEN if dev else RED}{dev}{RESET}')
-                except:
+                except BaseException:
                     logger.error(f'{dname(dev_type)} failed to listen as '
                                  f'{dev}.')
                     logger.info(f'Returning {dname(dev_type)} '
@@ -325,7 +346,7 @@ def _listener(hz_pull=4, hz_push=200):
                 finally:
                     logger.info(f'Freeing {dname(dev_type)} from listen queue.')
                     free_from_listen_queue(dev_type)
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
     def _state_pusher(hz):
         while True:
@@ -336,7 +357,7 @@ def _listener(hz_pull=4, hz_push=200):
                         try:
                             packet = _read_packet(dev_type)
                             unified_state.update(_read_packet(dev_type))
-                        except:
+                        except BaseException:
                             logger.error('Lost connection to '
                                          f'{dname(dev_type)}, deassigning '
                                          f'{get_device(dev_type)}.')
@@ -352,7 +373,7 @@ def _listener(hz_pull=4, hz_push=200):
                         logger.info(f'Pushing {dname(dev_type)} '
                                     'to identification queue.')
                         push_to_id_queue(dev_type)
-            time.sleep(1/hz)
+            time.sleep(1 / hz)
 
     queue_puller_thread = threading.Thread(target=_queue_puller,
                                            args=(hz_pull,))
@@ -360,6 +381,7 @@ def _listener(hz_pull=4, hz_push=200):
                                            args=(hz_push,))
     queue_puller_thread.start()
     state_pusher_thread.start()
+
 
 def _sender(hz=200):
 
@@ -376,11 +398,13 @@ def _sender(hz=200):
             dev_type, packet = head
             try:
                 _send_packet(dev_type, packet)
-            except:
+            except BaseException:
                 pass
-        time.sleep(1/hz)
+        time.sleep(1 / hz)
 
 # Convert octal to binary representation and run tests.
+
+
 def startup_tests(
         testable: List[Tuple[Callable, DeviceType]], verb=0o10) -> None:
     # i.e. 0o16 => reversed('1110') will run test_board_{latency,pingpong,crc}
@@ -390,6 +414,7 @@ def startup_tests(
                       if bit == '1']
     return [action(get_device(dev_type))
             for action, dev_type in selected_tests]
+
 
 def main(args) -> None:
     # Fork off our communication threads.
@@ -411,11 +436,11 @@ def main(args) -> None:
     # Run startup tests.
     if not args.skip_tests:
         testable: List[Tuple[Callable, DeviceType]] = [
-                (communicator.test_board_typea, BRD),     # 0o1
-                (communicator.test_board_crc, BRD),       # 0o2
-                (communicator.test_board_pingpong, BRD),  # 0o4
-                (communicator.test_board_latency, BRD),   # 0o10
-                ]
+            (communicator.test_board_typea, BRD),     # 0o1
+            (communicator.test_board_crc, BRD),       # 0o2
+            (communicator.test_board_pingpong, BRD),  # 0o4
+            (communicator.test_board_latency, BRD),   # 0o10
+        ]
         # [d]ev_[t]ype, [dev]ice, [req]uired
         dt_dev_reqset = {(dt, get_device(dt))
                          for _, dt in testable
@@ -429,7 +454,7 @@ def main(args) -> None:
         # Wait for devices to be ready.
         while any(get_device(dt) is None
                   for dt in dt_reqlst):
-            time.sleep(1/hz_id)
+            time.sleep(1 / hz_id)
         print('==> All devices attached, continuing.\n')
         try:
             startup_tests(testable, int(args.test, 8))
@@ -440,12 +465,12 @@ def main(args) -> None:
         exit(0)
 
     # Main loop
-    j=0
-    #cmd_id = config.SELFCHECK_CMD_ID
+    j = 0
+    # cmd_id = config.SELFCHECK_CMD_ID
     cmd_id = config.ARM_CMD_ID
     while True:
         j += 1
-        #data = {'mode': 'ID', 'debug_int': 0}
+        # data = {'mode': 'ID', 'debug_int': 0}
         data = {'floats':
                 {
                     'float0': j,
@@ -454,16 +479,16 @@ def main(args) -> None:
                     'float3': j,
                     'float4': j,
                     'float5': j,
-                    }
+                }
                 }
         try:
             packet = create_packet(BRD, cmd_id, data)
             push_to_send_queue(BRD, packet)
             print(unified_state.deepcopy()['floats'])
-        except:
+        except BaseException:
             pass
         time.sleep(1)
-        
+
 
 if __name__ == '__main__':
     """ Items in parsed_args:
@@ -476,7 +501,7 @@ if __name__ == '__main__':
     """
     # Remove first arg if called with python.
     _sl = slice(2, None) if 'python' in sys.argv[0] \
-                         else slice(1, None)
+        else slice(1, None)
     parsed_args = ap.parse_args(sys.argv[_sl])
     # Set up logging.
     set_up_loggers(loggers, parsed_args.verbosity)
