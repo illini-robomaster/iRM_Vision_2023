@@ -279,18 +279,20 @@ class UARTCommunicator(Communicator):
 
         OSX prefix: "tty.usbmodem"
         Jetson / Linux prefix: "ttyUSB", "ttyACM"
+        Linux: look under "/dev/serial/by-id": "usb-STMicroelectronics_STM32_STLink_"
 
         Returns:
             [Maybe dev_path] : a list of possible device paths
         """
         # list of possible prefixes
-        UART_PREFIX_LIST = ("tty.usbmodem", "ttyUSB", "ttyACM")
-        dev_list = os.listdir("/dev")
+        UART_PREFIX_LIST = ('tty.usbmodem', 'usb-STMicroelectronics_STM32_STLink_')
+        dev_basename = '/dev/serial/by-id'
+        dev_list = os.listdir(dev_basename)
 
         dev_paths = []  # ret val
         for dev_name in dev_list:
             if dev_name.startswith(UART_PREFIX_LIST):
-                dev_paths += [os.path.join('/dev', dev_name)]
+                dev_paths += [os.path.join(dev_basename, dev_name)]
         return dev_paths or [None]
 
     # path -> [path] -> Maybe serial.Serial

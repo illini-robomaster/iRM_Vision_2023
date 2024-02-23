@@ -243,7 +243,7 @@ function clean() {
     if [ ! -f "${script_log}" ]; then
         echo "${script_log}" does not exist.
         echo Nothing to be cleaned.
-        [ "${reinstall}" ] \
+        [ ${reinstall} ] \
             && return 0 \
             || exit 0
     fi
