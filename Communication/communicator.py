@@ -928,6 +928,7 @@ if __name__ == '__main__':
         PINGPONG = 2
         CRC = 3
         TYPE_A = 4
+    testing = Test.PINGPONG
 
     # Remove first arg if called with python.
     if 'python' in sys.argv[0]:
